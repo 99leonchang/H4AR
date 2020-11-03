@@ -28,6 +28,10 @@ extern DMA_HandleTypeDef hdma_dfsdm1_flt0;
 
 extern DMA_HandleTypeDef hdma_dfsdm1_flt1;
 
+extern DMA_HandleTypeDef hdma_dfsdm1_flt2;
+
+extern DMA_HandleTypeDef hdma_dfsdm1_flt3;
+
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN TD */
 
@@ -108,8 +112,9 @@ void HAL_DFSDM_FilterMspInit(DFSDM_Filter_HandleTypeDef* hdfsdm_filter)
     /**DFSDM1 GPIO Configuration
     PC2     ------> DFSDM1_CKOUT
     PB12     ------> DFSDM1_DATIN1
+    PC7     ------> DFSDM1_DATIN3
     */
-    GPIO_InitStruct.Pin = GPIO_PIN_2;
+    GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_7;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -173,6 +178,50 @@ void HAL_DFSDM_FilterMspInit(DFSDM_Filter_HandleTypeDef* hdfsdm_filter)
     __HAL_LINKDMA(hdfsdm_filter,hdmaReg,hdma_dfsdm1_flt1);
   }
 
+    /* DFSDM1_FLT2 Init */
+  if(hdfsdm_filter->Instance == DFSDM1_Filter2){
+    hdma_dfsdm1_flt2.Instance = DMA1_Channel6;
+    hdma_dfsdm1_flt2.Init.Request = DMA_REQUEST_0;
+    hdma_dfsdm1_flt2.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_dfsdm1_flt2.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_dfsdm1_flt2.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_dfsdm1_flt2.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+    hdma_dfsdm1_flt2.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
+    hdma_dfsdm1_flt2.Init.Mode = DMA_CIRCULAR;
+    hdma_dfsdm1_flt2.Init.Priority = DMA_PRIORITY_LOW;
+    if (HAL_DMA_Init(&hdma_dfsdm1_flt2) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    /* Several peripheral DMA handle pointers point to the same DMA handle.
+     Be aware that there is only one channel to perform all the requested DMAs. */
+    __HAL_LINKDMA(hdfsdm_filter,hdmaInj,hdma_dfsdm1_flt2);
+    __HAL_LINKDMA(hdfsdm_filter,hdmaReg,hdma_dfsdm1_flt2);
+  }
+
+    /* DFSDM1_FLT3 Init */
+  if(hdfsdm_filter->Instance == DFSDM1_Filter3){
+    hdma_dfsdm1_flt3.Instance = DMA1_Channel7;
+    hdma_dfsdm1_flt3.Init.Request = DMA_REQUEST_0;
+    hdma_dfsdm1_flt3.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_dfsdm1_flt3.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_dfsdm1_flt3.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_dfsdm1_flt3.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+    hdma_dfsdm1_flt3.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
+    hdma_dfsdm1_flt3.Init.Mode = DMA_CIRCULAR;
+    hdma_dfsdm1_flt3.Init.Priority = DMA_PRIORITY_LOW;
+    if (HAL_DMA_Init(&hdma_dfsdm1_flt3) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    /* Several peripheral DMA handle pointers point to the same DMA handle.
+     Be aware that there is only one channel to perform all the requested DMAs. */
+    __HAL_LINKDMA(hdfsdm_filter,hdmaInj,hdma_dfsdm1_flt3);
+    __HAL_LINKDMA(hdfsdm_filter,hdmaReg,hdma_dfsdm1_flt3);
+  }
+
 }
 
 /**
@@ -200,8 +249,9 @@ void HAL_DFSDM_ChannelMspInit(DFSDM_Channel_HandleTypeDef* hdfsdm_channel)
     /**DFSDM1 GPIO Configuration
     PC2     ------> DFSDM1_CKOUT
     PB12     ------> DFSDM1_DATIN1
+    PC7     ------> DFSDM1_DATIN3
     */
-    GPIO_InitStruct.Pin = GPIO_PIN_2;
+    GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_7;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -242,8 +292,9 @@ void HAL_DFSDM_FilterMspDeInit(DFSDM_Filter_HandleTypeDef* hdfsdm_filter)
     /**DFSDM1 GPIO Configuration
     PC2     ------> DFSDM1_CKOUT
     PB12     ------> DFSDM1_DATIN1
+    PC7     ------> DFSDM1_DATIN3
     */
-    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_2);
+    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_2|GPIO_PIN_7);
 
     HAL_GPIO_DeInit(GPIOB, GPIO_PIN_12);
 
@@ -277,8 +328,9 @@ void HAL_DFSDM_ChannelMspDeInit(DFSDM_Channel_HandleTypeDef* hdfsdm_channel)
     /**DFSDM1 GPIO Configuration
     PC2     ------> DFSDM1_CKOUT
     PB12     ------> DFSDM1_DATIN1
+    PC7     ------> DFSDM1_DATIN3
     */
-    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_2);
+    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_2|GPIO_PIN_7);
 
     HAL_GPIO_DeInit(GPIOB, GPIO_PIN_12);
 

@@ -42,10 +42,16 @@
 /* Private variables ---------------------------------------------------------*/
 DFSDM_Filter_HandleTypeDef hdfsdm1_filter0;
 DFSDM_Filter_HandleTypeDef hdfsdm1_filter1;
+DFSDM_Filter_HandleTypeDef hdfsdm1_filter2;
+DFSDM_Filter_HandleTypeDef hdfsdm1_filter3;
 DFSDM_Channel_HandleTypeDef hdfsdm1_channel0;
 DFSDM_Channel_HandleTypeDef hdfsdm1_channel1;
+DFSDM_Channel_HandleTypeDef hdfsdm1_channel2;
+DFSDM_Channel_HandleTypeDef hdfsdm1_channel3;
 DMA_HandleTypeDef hdma_dfsdm1_flt0;
 DMA_HandleTypeDef hdma_dfsdm1_flt1;
+DMA_HandleTypeDef hdma_dfsdm1_flt2;
+DMA_HandleTypeDef hdma_dfsdm1_flt3;
 
 /* USER CODE BEGIN PV */
 
@@ -63,12 +69,18 @@ static void MX_DFSDM1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 #define AUDIO_REC 32
-#define MICS 2
-int32_t RecBuf[MICS][AUDIO_REC];
-int32_t PlayBuf[MICS][AUDIO_REC];
+#define MICS 4
+int32_t PlayBuf0[AUDIO_REC];
+int32_t PlayBuf1[AUDIO_REC];
+int32_t PlayBuf2[AUDIO_REC];
+int32_t PlayBuf3[AUDIO_REC];
+int32_t RecBuf0[AUDIO_REC];
+int32_t RecBuf1[AUDIO_REC];
+int32_t RecBuf2[AUDIO_REC];
+int32_t RecBuf3[AUDIO_REC];
 
-uint8_t DmaRecHalfBuffComplete[MICS] = {0, 0};
-uint8_t DmaRecBuffComplete[MICS] = {0, 0};
+uint8_t DmaRecHalfBuffComplete[MICS] = {0, 0, 0, 0};
+uint8_t DmaRecBuffComplete[MICS] = {0, 0, 0, 0};
 
 void HAL_DFSDM_FilterRegConvHalfCpltCallback0(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
 	DmaRecHalfBuffComplete[0] = 1;
@@ -76,6 +88,11 @@ void HAL_DFSDM_FilterRegConvHalfCpltCallback0(DFSDM_Filter_HandleTypeDef *hdfsdm
 
 void HAL_DFSDM_FilterRegConvCpltCallback0(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
 	DmaRecBuffComplete[0] = 1;
+}
+
+void HAL_DFSDM_FilterErrorCallback0(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
+	uint32_t error = HAL_DFSDM_FilterGetError(hdfsdm_filter);
+	error = error + 0;
 }
 
 void HAL_DFSDM_FilterRegConvHalfCpltCallback1(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
@@ -86,14 +103,57 @@ void HAL_DFSDM_FilterRegConvCpltCallback1(DFSDM_Filter_HandleTypeDef *hdfsdm_fil
 	DmaRecBuffComplete[1] = 1;
 }
 
-void HAL_DFSDM_FilterErrorCallback0(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
+void HAL_DFSDM_FilterErrorCallback1(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
 	uint32_t error = HAL_DFSDM_FilterGetError(hdfsdm_filter);
 	error = error + 0;
 }
 
-void HAL_DFSDM_FilterErrorCallback1(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
+void HAL_DFSDM_FilterRegConvHalfCpltCallback2(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
+	DmaRecHalfBuffComplete[2] = 1;
+}
+
+void HAL_DFSDM_FilterRegConvCpltCallback2(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
+	DmaRecBuffComplete[2] = 1;
+}
+
+void HAL_DFSDM_FilterErrorCallback2(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
 	uint32_t error = HAL_DFSDM_FilterGetError(hdfsdm_filter);
 	error = error + 0;
+}
+
+void HAL_DFSDM_FilterRegConvHalfCpltCallback3(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
+	DmaRecHalfBuffComplete[3] = 1;
+}
+
+void HAL_DFSDM_FilterRegConvCpltCallback3(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
+	DmaRecBuffComplete[3] = 1;
+}
+
+void HAL_DFSDM_FilterErrorCallback3(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
+	uint32_t error = HAL_DFSDM_FilterGetError(hdfsdm_filter);
+	error = error + 0;
+}
+
+void BufferMagic(int offset, int low, int high) {
+	int32_t *buffer = 0;
+	switch (offset) {
+		case 0: buffer = PlayBuf0; break;
+		case 1: buffer = PlayBuf1; break;
+		case 2: buffer = PlayBuf2; break;
+		case 3: buffer = PlayBuf3; break;
+	}
+
+	int32_t *recbuffer = 0;
+	switch (offset) {
+		case 0: recbuffer = RecBuf0; break;
+		case 1: recbuffer = RecBuf1; break;
+		case 2: recbuffer = RecBuf2; break;
+		case 3: recbuffer = RecBuf3; break;
+	}
+
+	for (uint16_t i = low; i < high; i++) {
+		buffer[i] = recbuffer[i] >> 8;
+	}
 }
 /* USER CODE END 0 */
 
@@ -104,12 +164,12 @@ void HAL_DFSDM_FilterErrorCallback1(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	int status[2] = {2, 2};
+	int status[MICS] = {2, 2, 2, 2};
 	for (int i = 0; i < AUDIO_REC; i++) {
-		PlayBuf[0][i] = 4;
-		RecBuf[0][i] = 16;
-		PlayBuf[1][i] = 5;
-		RecBuf[1][i] = 17;
+		PlayBuf0[i] = 0;
+		PlayBuf1[i] = 0;
+		PlayBuf2[i] = 0;
+		PlayBuf3[i] = 0;
 	}
   /* USER CODE END 1 */
 
@@ -141,6 +201,12 @@ int main(void)
   HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter1,
 		  HAL_DFSDM_FILTER_REGCONV_HALFCOMPLETE_CB_ID,
 		  HAL_DFSDM_FilterRegConvHalfCpltCallback1);
+  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter2,
+		  HAL_DFSDM_FILTER_REGCONV_HALFCOMPLETE_CB_ID,
+		  HAL_DFSDM_FilterRegConvHalfCpltCallback2);
+  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter3,
+		  HAL_DFSDM_FILTER_REGCONV_HALFCOMPLETE_CB_ID,
+		  HAL_DFSDM_FilterRegConvHalfCpltCallback3);
   // complete callbacks
   HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter0,
 		  HAL_DFSDM_FILTER_REGCONV_COMPLETE_CB_ID,
@@ -148,6 +214,12 @@ int main(void)
   HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter1,
 		  HAL_DFSDM_FILTER_REGCONV_COMPLETE_CB_ID,
 		  HAL_DFSDM_FilterRegConvCpltCallback1);
+  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter2,
+		  HAL_DFSDM_FILTER_REGCONV_COMPLETE_CB_ID,
+		  HAL_DFSDM_FilterRegConvCpltCallback2);
+  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter3,
+		  HAL_DFSDM_FILTER_REGCONV_COMPLETE_CB_ID,
+		  HAL_DFSDM_FilterRegConvCpltCallback3);
   // error callbacks
   HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter0,
 		  HAL_DFSDM_FILTER_ERROR_CB_ID,
@@ -155,8 +227,17 @@ int main(void)
   HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter1,
 		  HAL_DFSDM_FILTER_ERROR_CB_ID,
 		  HAL_DFSDM_FilterErrorCallback1);
-  status[0] = HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, RecBuf[0], AUDIO_REC);
-  status[1] = HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter1, RecBuf[1], AUDIO_REC);
+  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter2,
+		  HAL_DFSDM_FILTER_ERROR_CB_ID,
+		  HAL_DFSDM_FilterErrorCallback2);
+  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter3,
+		  HAL_DFSDM_FILTER_ERROR_CB_ID,
+		  HAL_DFSDM_FilterErrorCallback3);
+
+  status[0] = HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, RecBuf0, AUDIO_REC);
+  status[1] = HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter1, RecBuf1, AUDIO_REC);
+  status[2] = HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter2, RecBuf2, AUDIO_REC);
+  status[3] = HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter3, RecBuf3, AUDIO_REC);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -168,17 +249,13 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  for (int j = 0; j < 2; j++) {
+	  for (int j = 0; j < MICS; j++) {
 		if (DmaRecHalfBuffComplete[j]) {
-			for (uint16_t i = 0; i < AUDIO_REC / 2; i++) {
-				PlayBuf[j][i] = RecBuf[j][i] >> 8;
-			}
+			BufferMagic(j, 0, AUDIO_REC/2);
 			DmaRecHalfBuffComplete[j] = 0;
 		}
 		if (DmaRecBuffComplete[j]) {
-			for (uint16_t i = AUDIO_REC / 2; i < AUDIO_REC; i++) {
-				PlayBuf[j][i] = RecBuf[j][i] >> 8;
-			}
+			BufferMagic(j, AUDIO_REC / 2, AUDIO_REC);
 			DmaRecBuffComplete[j] = 0;
 		}
 	  }
@@ -271,10 +348,32 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_filter1.Init.RegularParam.Trigger = DFSDM_FILTER_SW_TRIGGER;
   hdfsdm1_filter1.Init.RegularParam.FastMode = ENABLE;
   hdfsdm1_filter1.Init.RegularParam.DmaMode = ENABLE;
-  hdfsdm1_filter1.Init.FilterParam.SincOrder = DFSDM_FILTER_FASTSINC_ORDER;
-  hdfsdm1_filter1.Init.FilterParam.Oversampling = 1;
+  hdfsdm1_filter1.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
+  hdfsdm1_filter1.Init.FilterParam.Oversampling = 250;
   hdfsdm1_filter1.Init.FilterParam.IntOversampling = 1;
   if (HAL_DFSDM_FilterInit(&hdfsdm1_filter1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  hdfsdm1_filter2.Instance = DFSDM1_Filter2;
+  hdfsdm1_filter2.Init.RegularParam.Trigger = DFSDM_FILTER_SW_TRIGGER;
+  hdfsdm1_filter2.Init.RegularParam.FastMode = ENABLE;
+  hdfsdm1_filter2.Init.RegularParam.DmaMode = ENABLE;
+  hdfsdm1_filter2.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
+  hdfsdm1_filter2.Init.FilterParam.Oversampling = 250;
+  hdfsdm1_filter2.Init.FilterParam.IntOversampling = 1;
+  if (HAL_DFSDM_FilterInit(&hdfsdm1_filter2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  hdfsdm1_filter3.Instance = DFSDM1_Filter3;
+  hdfsdm1_filter3.Init.RegularParam.Trigger = DFSDM_FILTER_SW_TRIGGER;
+  hdfsdm1_filter3.Init.RegularParam.FastMode = ENABLE;
+  hdfsdm1_filter3.Init.RegularParam.DmaMode = ENABLE;
+  hdfsdm1_filter3.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
+  hdfsdm1_filter3.Init.FilterParam.Oversampling = 250;
+  hdfsdm1_filter3.Init.FilterParam.IntOversampling = 1;
+  if (HAL_DFSDM_FilterInit(&hdfsdm1_filter3) != HAL_OK)
   {
     Error_Handler();
   }
@@ -312,11 +411,53 @@ static void MX_DFSDM1_Init(void)
   {
     Error_Handler();
   }
+  hdfsdm1_channel2.Instance = DFSDM1_Channel2;
+  hdfsdm1_channel2.Init.OutputClock.Activation = ENABLE;
+  hdfsdm1_channel2.Init.OutputClock.Selection = DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
+  hdfsdm1_channel2.Init.OutputClock.Divider = 40;
+  hdfsdm1_channel2.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
+  hdfsdm1_channel2.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
+  hdfsdm1_channel2.Init.Input.Pins = DFSDM_CHANNEL_FOLLOWING_CHANNEL_PINS;
+  hdfsdm1_channel2.Init.SerialInterface.Type = DFSDM_CHANNEL_SPI_FALLING;
+  hdfsdm1_channel2.Init.SerialInterface.SpiClock = DFSDM_CHANNEL_SPI_CLOCK_INTERNAL;
+  hdfsdm1_channel2.Init.Awd.FilterOrder = DFSDM_CHANNEL_FASTSINC_ORDER;
+  hdfsdm1_channel2.Init.Awd.Oversampling = 1;
+  hdfsdm1_channel2.Init.Offset = 0;
+  hdfsdm1_channel2.Init.RightBitShift = 0x00;
+  if (HAL_DFSDM_ChannelInit(&hdfsdm1_channel2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  hdfsdm1_channel3.Instance = DFSDM1_Channel3;
+  hdfsdm1_channel3.Init.OutputClock.Activation = ENABLE;
+  hdfsdm1_channel3.Init.OutputClock.Selection = DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
+  hdfsdm1_channel3.Init.OutputClock.Divider = 40;
+  hdfsdm1_channel3.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
+  hdfsdm1_channel3.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
+  hdfsdm1_channel3.Init.Input.Pins = DFSDM_CHANNEL_SAME_CHANNEL_PINS;
+  hdfsdm1_channel3.Init.SerialInterface.Type = DFSDM_CHANNEL_SPI_RISING;
+  hdfsdm1_channel3.Init.SerialInterface.SpiClock = DFSDM_CHANNEL_SPI_CLOCK_INTERNAL;
+  hdfsdm1_channel3.Init.Awd.FilterOrder = DFSDM_CHANNEL_FASTSINC_ORDER;
+  hdfsdm1_channel3.Init.Awd.Oversampling = 1;
+  hdfsdm1_channel3.Init.Offset = 0;
+  hdfsdm1_channel3.Init.RightBitShift = 0x00;
+  if (HAL_DFSDM_ChannelInit(&hdfsdm1_channel3) != HAL_OK)
+  {
+    Error_Handler();
+  }
   if (HAL_DFSDM_FilterConfigRegChannel(&hdfsdm1_filter0, DFSDM_CHANNEL_0, DFSDM_CONTINUOUS_CONV_ON) != HAL_OK)
   {
     Error_Handler();
   }
   if (HAL_DFSDM_FilterConfigRegChannel(&hdfsdm1_filter1, DFSDM_CHANNEL_1, DFSDM_CONTINUOUS_CONV_ON) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_DFSDM_FilterConfigRegChannel(&hdfsdm1_filter2, DFSDM_CHANNEL_2, DFSDM_CONTINUOUS_CONV_ON) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_DFSDM_FilterConfigRegChannel(&hdfsdm1_filter3, DFSDM_CHANNEL_3, DFSDM_CONTINUOUS_CONV_ON) != HAL_OK)
   {
     Error_Handler();
   }
@@ -342,6 +483,12 @@ static void MX_DMA_Init(void)
   /* DMA1_Channel5_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
+  /* DMA1_Channel6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel6_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);
+  /* DMA1_Channel7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel7_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
 
 }
 
