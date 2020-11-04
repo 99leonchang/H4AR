@@ -19,6 +19,9 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "constants.h"
+#include "acoustic_sl.h"
+#include "sound_localizer.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -68,75 +71,72 @@ static void MX_DFSDM1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define AUDIO_REC 32
-#define MICS 4
-int32_t PlayBuf0[AUDIO_REC];
-int32_t PlayBuf1[AUDIO_REC];
-int32_t PlayBuf2[AUDIO_REC];
-int32_t PlayBuf3[AUDIO_REC];
-int32_t RecBuf0[AUDIO_REC];
-int32_t RecBuf1[AUDIO_REC];
-int32_t RecBuf2[AUDIO_REC];
-int32_t RecBuf3[AUDIO_REC];
+int16_t PlayBuf0[AUDIO_REC_SIZE];
+int16_t PlayBuf1[AUDIO_REC_SIZE];
+int16_t PlayBuf2[AUDIO_REC_SIZE];
+int16_t PlayBuf3[AUDIO_REC_SIZE];
+int32_t RecBuf0[AUDIO_REC_SIZE];
+int32_t RecBuf1[AUDIO_REC_SIZE];
+int32_t RecBuf2[AUDIO_REC_SIZE];
+int32_t RecBuf3[AUDIO_REC_SIZE];
+
+volatile int32_t AngleExists;
+volatile int32_t AngleEstimation;
+
+// Whether first half of PlayBuf[i] is ready for acousticSL
+uint8_t PlayHalfReady[MICS] = {0, 0, 0, 0};
+
+// Whether second half of PlayBuf[i] is ready for acousticSL
+uint8_t PlaySecondHalfReady[MICS] = {0, 0, 0, 0};
 
 uint8_t DmaRecHalfBuffComplete[MICS] = {0, 0, 0, 0};
 uint8_t DmaRecBuffComplete[MICS] = {0, 0, 0, 0};
 
-void HAL_DFSDM_FilterRegConvHalfCpltCallback0(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	DmaRecHalfBuffComplete[0] = 1;
+int DFSDMFilterToIndex(DFSDM_Filter_HandleTypeDef *hfdfsdm_filter) {
+	if (&hdfsdm1_filter0 == hfdfsdm_filter) return 0;
+	else if (&hdfsdm1_filter1 == hfdfsdm_filter) return 1;
+	else if (&hdfsdm1_filter2 == hfdfsdm_filter) return 2;
+	else return 3;
 }
 
-void HAL_DFSDM_FilterRegConvCpltCallback0(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	DmaRecBuffComplete[0] = 1;
+DFSDM_Filter_HandleTypeDef* IndexToDFSDMFilter(int index) {
+	switch (index) {
+		case 0: return &hdfsdm1_filter0;
+		case 1: return &hdfsdm1_filter1;
+		case 2: return &hdfsdm1_filter2;
+		case 3: return &hdfsdm1_filter3;
+	}
+
+	return NULL;
 }
 
-void HAL_DFSDM_FilterErrorCallback0(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	uint32_t error = HAL_DFSDM_FilterGetError(hdfsdm_filter);
-	error = error + 0;
+void HAL_DFSDM_FilterRegConvHalfCpltCallback(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
+	DmaRecHalfBuffComplete[DFSDMFilterToIndex(hdfsdm_filter)] = 1;
 }
 
-void HAL_DFSDM_FilterRegConvHalfCpltCallback1(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	DmaRecHalfBuffComplete[1] = 1;
+void HAL_DFSDM_FilterRegConvCpltCallback(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
+	DmaRecBuffComplete[DFSDMFilterToIndex(hdfsdm_filter)] = 1;
 }
 
-void HAL_DFSDM_FilterRegConvCpltCallback1(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	DmaRecBuffComplete[1] = 1;
+void HAL_DFSDM_FilterErrorCallback(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
+	while (1) {
+
+	}
 }
 
-void HAL_DFSDM_FilterErrorCallback1(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	uint32_t error = HAL_DFSDM_FilterGetError(hdfsdm_filter);
-	error = error + 0;
+int IsAllSet(uint8_t *buffer, int n) {
+	for (int i = 0; i < n; i++) {
+		if (buffer[i] == 0) {
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
-void HAL_DFSDM_FilterRegConvHalfCpltCallback2(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	DmaRecHalfBuffComplete[2] = 1;
-}
-
-void HAL_DFSDM_FilterRegConvCpltCallback2(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	DmaRecBuffComplete[2] = 1;
-}
-
-void HAL_DFSDM_FilterErrorCallback2(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	uint32_t error = HAL_DFSDM_FilterGetError(hdfsdm_filter);
-	error = error + 0;
-}
-
-void HAL_DFSDM_FilterRegConvHalfCpltCallback3(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	DmaRecHalfBuffComplete[3] = 1;
-}
-
-void HAL_DFSDM_FilterRegConvCpltCallback3(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	DmaRecBuffComplete[3] = 1;
-}
-
-void HAL_DFSDM_FilterErrorCallback3(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	uint32_t error = HAL_DFSDM_FilterGetError(hdfsdm_filter);
-	error = error + 0;
-}
-
-void BufferMagic(int offset, int low, int high) {
-	int32_t *buffer = 0;
-	switch (offset) {
+void GetBuffers(int index, int16_t **playbuf, int32_t **recbuf) {
+	int16_t *buffer = 0;
+	switch (index) {
 		case 0: buffer = PlayBuf0; break;
 		case 1: buffer = PlayBuf1; break;
 		case 2: buffer = PlayBuf2; break;
@@ -144,17 +144,55 @@ void BufferMagic(int offset, int low, int high) {
 	}
 
 	int32_t *recbuffer = 0;
-	switch (offset) {
+	switch (index) {
 		case 0: recbuffer = RecBuf0; break;
 		case 1: recbuffer = RecBuf1; break;
 		case 2: recbuffer = RecBuf2; break;
 		case 3: recbuffer = RecBuf3; break;
 	}
 
-	for (uint16_t i = low; i < high; i++) {
-		buffer[i] = recbuffer[i] >> 8;
+	if (playbuf) *playbuf = buffer;
+	if (recbuf) *recbuf = recbuffer;
+}
+
+void ClearUI8Buffers(uint8_t *buffer, int n) {
+	for (int i = 0; i < n; i++) {
+		buffer[i] = 0;
 	}
 }
+
+void ClearBuffers(int offset) {
+	int16_t *playbuf;
+	int32_t *recbuf;
+	GetBuffers(offset, &playbuf, &recbuf);
+	for (int i = 0; i < AUDIO_REC_SIZE; i++) {
+		playbuf[i] = 0;
+		recbuf[i] = 0;
+	}
+}
+
+void TransferBuffers(int offset, int low, int high) {
+	int16_t *buffer;
+	int32_t *recbuffer;
+	GetBuffers(offset, &buffer, &recbuffer);
+
+	// acousticSL only wants 16 bits
+	for (uint16_t i = low; i < high; i++) {
+		buffer[i] = recbuffer[i] >> 16;
+	}
+}
+
+void EXTI1_Callback(void) {
+	Audio_ProcessAngle();
+	int32_t angle = Audio_GetAngle();
+	if (angle == ACOUSTIC_SL_NO_AUDIO_DETECTED) {
+		AngleExists = 0;
+	} else {
+		AngleExists = 1;
+		AngleEstimation = angle;
+	}
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -164,13 +202,6 @@ void BufferMagic(int offset, int low, int high) {
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	int status[MICS] = {2, 2, 2, 2};
-	for (int i = 0; i < AUDIO_REC; i++) {
-		PlayBuf0[i] = 0;
-		PlayBuf1[i] = 0;
-		PlayBuf2[i] = 0;
-		PlayBuf3[i] = 0;
-	}
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -194,70 +225,75 @@ int main(void)
   MX_DMA_Init();
   MX_DFSDM1_Init();
   /* USER CODE BEGIN 2 */
-  // halfcomplete callbacks
-  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter0,
-		  HAL_DFSDM_FILTER_REGCONV_HALFCOMPLETE_CB_ID,
-		  HAL_DFSDM_FilterRegConvHalfCpltCallback0);
-  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter1,
-		  HAL_DFSDM_FILTER_REGCONV_HALFCOMPLETE_CB_ID,
-		  HAL_DFSDM_FilterRegConvHalfCpltCallback1);
-  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter2,
-		  HAL_DFSDM_FILTER_REGCONV_HALFCOMPLETE_CB_ID,
-		  HAL_DFSDM_FilterRegConvHalfCpltCallback2);
-  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter3,
-		  HAL_DFSDM_FILTER_REGCONV_HALFCOMPLETE_CB_ID,
-		  HAL_DFSDM_FilterRegConvHalfCpltCallback3);
-  // complete callbacks
-  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter0,
-		  HAL_DFSDM_FILTER_REGCONV_COMPLETE_CB_ID,
-		  HAL_DFSDM_FilterRegConvCpltCallback0);
-  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter1,
-		  HAL_DFSDM_FILTER_REGCONV_COMPLETE_CB_ID,
-		  HAL_DFSDM_FilterRegConvCpltCallback1);
-  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter2,
-		  HAL_DFSDM_FILTER_REGCONV_COMPLETE_CB_ID,
-		  HAL_DFSDM_FilterRegConvCpltCallback2);
-  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter3,
-		  HAL_DFSDM_FILTER_REGCONV_COMPLETE_CB_ID,
-		  HAL_DFSDM_FilterRegConvCpltCallback3);
-  // error callbacks
-  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter0,
-		  HAL_DFSDM_FILTER_ERROR_CB_ID,
-		  HAL_DFSDM_FilterErrorCallback0);
-  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter1,
-		  HAL_DFSDM_FILTER_ERROR_CB_ID,
-		  HAL_DFSDM_FilterErrorCallback1);
-  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter2,
-		  HAL_DFSDM_FILTER_ERROR_CB_ID,
-		  HAL_DFSDM_FilterErrorCallback2);
-  HAL_DFSDM_Filter_RegisterCallback(&hdfsdm1_filter3,
-		  HAL_DFSDM_FILTER_ERROR_CB_ID,
-		  HAL_DFSDM_FilterErrorCallback3);
 
-  status[0] = HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter0, RecBuf0, AUDIO_REC);
-  status[1] = HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter1, RecBuf1, AUDIO_REC);
-  status[2] = HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter2, RecBuf2, AUDIO_REC);
-  status[3] = HAL_DFSDM_FilterRegularStart_DMA(&hdfsdm1_filter3, RecBuf3, AUDIO_REC);
+  int status = Audio_Libraries_Init(M12_DISTANCE, SAMPLING_FREQUENCY);
+
+  for (int i = 0; i < MICS; i++) {
+	  ClearBuffers(i);
+	  DFSDM_Filter_HandleTypeDef *filter = IndexToDFSDMFilter(i);
+	  HAL_DFSDM_Filter_RegisterCallback(filter, HAL_DFSDM_FILTER_REGCONV_HALFCOMPLETE_CB_ID, HAL_DFSDM_FilterRegConvHalfCpltCallback);
+	  HAL_DFSDM_Filter_RegisterCallback(filter, HAL_DFSDM_FILTER_REGCONV_COMPLETE_CB_ID, HAL_DFSDM_FilterRegConvCpltCallback);
+	  HAL_DFSDM_Filter_RegisterCallback(filter, HAL_DFSDM_FILTER_ERROR_CB_ID, HAL_DFSDM_FilterErrorCallback);
+  }
+
+  for (int i = 0; i < MICS; i++) {
+	  DFSDM_Filter_HandleTypeDef *filter = IndexToDFSDMFilter(i);
+	  int32_t *recbuf;
+	  GetBuffers(i, NULL, &recbuf);
+	  status += HAL_DFSDM_FilterRegularStart_DMA(filter, recbuf, AUDIO_REC_SIZE);
+  }
+
+  // TODO: Don't preempt computing angles -- dubious at best, evil at worst?
+  HAL_NVIC_SetPriority((IRQn_Type)EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ((IRQn_Type)EXTI1_IRQn);
+
+  if (status != 0) {
+	  Error_Handler();
+  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	// HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-	// HAL_Delay(10000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  int process = 0;
+	  if (IsAllSet(PlayHalfReady, MICS)) {
+		  int16_t *rec0;
+		  int16_t *rec3;
+		  GetBuffers(0, &rec0, NULL);
+		  GetBuffers(3, &rec3, NULL);
+		  ClearUI8Buffers(PlayHalfReady, MICS);
+
+		  // TODO: what if more mics
+		  process = Audio_Process_Data_Input(rec0, rec3);
+	  } else if (IsAllSet(PlaySecondHalfReady, MICS)) {
+		  int16_t *rec0;
+		  int16_t *rec3;
+		  GetBuffers(0, &rec0, NULL);
+		  GetBuffers(3, &rec3, NULL);
+		  ClearUI8Buffers(PlaySecondHalfReady, MICS);
+		  process = Audio_Process_Data_Input(rec0 + (AUDIO_REC_SIZE/2), rec3 + (AUDIO_REC_SIZE/2));
+	  }
+
+	  if (process) {
+		  HAL_NVIC_SetPendingIRQ(EXTI1_IRQn);
+	  }
+
 	  for (int j = 0; j < MICS; j++) {
-		if (DmaRecHalfBuffComplete[j]) {
-			BufferMagic(j, 0, AUDIO_REC/2);
-			DmaRecHalfBuffComplete[j] = 0;
-		}
-		if (DmaRecBuffComplete[j]) {
-			BufferMagic(j, AUDIO_REC / 2, AUDIO_REC);
-			DmaRecBuffComplete[j] = 0;
-		}
+		  if (DmaRecHalfBuffComplete[j]) {
+			  TransferBuffers(j, 0, AUDIO_REC_SIZE/2);
+			  DmaRecHalfBuffComplete[j] = 0;
+			  PlayHalfReady[j] = 1;
+		  }
+		  if (DmaRecBuffComplete[j]) {
+			  TransferBuffers(j, AUDIO_REC_SIZE / 2, AUDIO_REC_SIZE);
+			  DmaRecBuffComplete[j] = 0;
+			  PlaySecondHalfReady[j] = 1;
+		  }
 	  }
   }
   /* USER CODE END 3 */
@@ -530,7 +566,10 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-
+	while (1) {
+		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+		HAL_Delay(1000);
+	}
   /* USER CODE END Error_Handler_Debug */
 }
 

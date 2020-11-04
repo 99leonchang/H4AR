@@ -258,5 +258,16 @@ void DMA1_Channel7_IRQHandler(void)
 
 /* USER CODE BEGIN 1 */
 
+/**
+* @brief  This function handles EXTI1 interrupt.
+* @param  None
+* @retval None
+*/
+void EXTI1_IRQHandler(void)
+{
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_1);
+    EXTI1_Callback();
+}
+
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
