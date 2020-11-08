@@ -24,13 +24,13 @@
 /* USER CODE BEGIN Includes */
 
 /* USER CODE END Includes */
-extern DMA_HandleTypeDef hdma_dfsdm1_flt0;
-
 extern DMA_HandleTypeDef hdma_dfsdm1_flt1;
 
-extern DMA_HandleTypeDef hdma_dfsdm1_flt2;
-
 extern DMA_HandleTypeDef hdma_dfsdm1_flt3;
+
+extern DMA_HandleTypeDef hdma_dfsdm1_flt0;
+
+extern DMA_HandleTypeDef hdma_dfsdm1_flt2;
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN TD */
@@ -134,28 +134,6 @@ void HAL_DFSDM_FilterMspInit(DFSDM_Filter_HandleTypeDef* hdfsdm_filter)
   }
 
     /* DFSDM1 DMA Init */
-    /* DFSDM1_FLT0 Init */
-  if(hdfsdm_filter->Instance == DFSDM1_Filter0){
-    hdma_dfsdm1_flt0.Instance = DMA1_Channel4;
-    hdma_dfsdm1_flt0.Init.Request = DMA_REQUEST_0;
-    hdma_dfsdm1_flt0.Init.Direction = DMA_PERIPH_TO_MEMORY;
-    hdma_dfsdm1_flt0.Init.PeriphInc = DMA_PINC_DISABLE;
-    hdma_dfsdm1_flt0.Init.MemInc = DMA_MINC_ENABLE;
-    hdma_dfsdm1_flt0.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
-    hdma_dfsdm1_flt0.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
-    hdma_dfsdm1_flt0.Init.Mode = DMA_CIRCULAR;
-    hdma_dfsdm1_flt0.Init.Priority = DMA_PRIORITY_LOW;
-    if (HAL_DMA_Init(&hdma_dfsdm1_flt0) != HAL_OK)
-    {
-      Error_Handler();
-    }
-
-    /* Several peripheral DMA handle pointers point to the same DMA handle.
-     Be aware that there is only one channel to perform all the requested DMAs. */
-    __HAL_LINKDMA(hdfsdm_filter,hdmaInj,hdma_dfsdm1_flt0);
-    __HAL_LINKDMA(hdfsdm_filter,hdmaReg,hdma_dfsdm1_flt0);
-  }
-
     /* DFSDM1_FLT1 Init */
   if(hdfsdm_filter->Instance == DFSDM1_Filter1){
     hdma_dfsdm1_flt1.Instance = DMA1_Channel5;
@@ -178,28 +156,6 @@ void HAL_DFSDM_FilterMspInit(DFSDM_Filter_HandleTypeDef* hdfsdm_filter)
     __HAL_LINKDMA(hdfsdm_filter,hdmaReg,hdma_dfsdm1_flt1);
   }
 
-    /* DFSDM1_FLT2 Init */
-  if(hdfsdm_filter->Instance == DFSDM1_Filter2){
-    hdma_dfsdm1_flt2.Instance = DMA1_Channel6;
-    hdma_dfsdm1_flt2.Init.Request = DMA_REQUEST_0;
-    hdma_dfsdm1_flt2.Init.Direction = DMA_PERIPH_TO_MEMORY;
-    hdma_dfsdm1_flt2.Init.PeriphInc = DMA_PINC_DISABLE;
-    hdma_dfsdm1_flt2.Init.MemInc = DMA_MINC_ENABLE;
-    hdma_dfsdm1_flt2.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
-    hdma_dfsdm1_flt2.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
-    hdma_dfsdm1_flt2.Init.Mode = DMA_CIRCULAR;
-    hdma_dfsdm1_flt2.Init.Priority = DMA_PRIORITY_LOW;
-    if (HAL_DMA_Init(&hdma_dfsdm1_flt2) != HAL_OK)
-    {
-      Error_Handler();
-    }
-
-    /* Several peripheral DMA handle pointers point to the same DMA handle.
-     Be aware that there is only one channel to perform all the requested DMAs. */
-    __HAL_LINKDMA(hdfsdm_filter,hdmaInj,hdma_dfsdm1_flt2);
-    __HAL_LINKDMA(hdfsdm_filter,hdmaReg,hdma_dfsdm1_flt2);
-  }
-
     /* DFSDM1_FLT3 Init */
   if(hdfsdm_filter->Instance == DFSDM1_Filter3){
     hdma_dfsdm1_flt3.Instance = DMA1_Channel7;
@@ -220,6 +176,50 @@ void HAL_DFSDM_FilterMspInit(DFSDM_Filter_HandleTypeDef* hdfsdm_filter)
      Be aware that there is only one channel to perform all the requested DMAs. */
     __HAL_LINKDMA(hdfsdm_filter,hdmaInj,hdma_dfsdm1_flt3);
     __HAL_LINKDMA(hdfsdm_filter,hdmaReg,hdma_dfsdm1_flt3);
+  }
+
+    /* DFSDM1_FLT0 Init */
+  if(hdfsdm_filter->Instance == DFSDM1_Filter0){
+    hdma_dfsdm1_flt0.Instance = DMA1_Channel4;
+    hdma_dfsdm1_flt0.Init.Request = DMA_REQUEST_0;
+    hdma_dfsdm1_flt0.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_dfsdm1_flt0.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_dfsdm1_flt0.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_dfsdm1_flt0.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+    hdma_dfsdm1_flt0.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
+    hdma_dfsdm1_flt0.Init.Mode = DMA_CIRCULAR;
+    hdma_dfsdm1_flt0.Init.Priority = DMA_PRIORITY_LOW;
+    if (HAL_DMA_Init(&hdma_dfsdm1_flt0) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    /* Several peripheral DMA handle pointers point to the same DMA handle.
+     Be aware that there is only one channel to perform all the requested DMAs. */
+    __HAL_LINKDMA(hdfsdm_filter,hdmaInj,hdma_dfsdm1_flt0);
+    __HAL_LINKDMA(hdfsdm_filter,hdmaReg,hdma_dfsdm1_flt0);
+  }
+
+    /* DFSDM1_FLT2 Init */
+  if(hdfsdm_filter->Instance == DFSDM1_Filter2){
+    hdma_dfsdm1_flt2.Instance = DMA1_Channel6;
+    hdma_dfsdm1_flt2.Init.Request = DMA_REQUEST_0;
+    hdma_dfsdm1_flt2.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_dfsdm1_flt2.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_dfsdm1_flt2.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_dfsdm1_flt2.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+    hdma_dfsdm1_flt2.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
+    hdma_dfsdm1_flt2.Init.Mode = DMA_CIRCULAR;
+    hdma_dfsdm1_flt2.Init.Priority = DMA_PRIORITY_LOW;
+    if (HAL_DMA_Init(&hdma_dfsdm1_flt2) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    /* Several peripheral DMA handle pointers point to the same DMA handle.
+     Be aware that there is only one channel to perform all the requested DMAs. */
+    __HAL_LINKDMA(hdfsdm_filter,hdmaInj,hdma_dfsdm1_flt2);
+    __HAL_LINKDMA(hdfsdm_filter,hdmaReg,hdma_dfsdm1_flt2);
   }
 
 }

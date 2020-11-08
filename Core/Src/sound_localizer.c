@@ -5,6 +5,7 @@
  *      Author: William
  */
 
+#include "constants.h"
 #include "sound_localizer.h"
 #include "acoustic_sl.h"
 #include <stdlib.h>
@@ -45,14 +46,14 @@ uint32_t Audio_Libraries_Init(uint16_t m12_distance, uint32_t freq)
   libSoundSourceLoc_Handler_Instance.ptr_M2_channels = 1;
   libSoundSourceLoc_Handler_Instance.ptr_M3_channels = 1;
   libSoundSourceLoc_Handler_Instance.ptr_M4_channels = 1;
-  libSoundSourceLoc_Handler_Instance.samples_to_process = 64; // # channels x (2ms * freq) * # ptr/channels
+  libSoundSourceLoc_Handler_Instance.samples_to_process = 4 * libSoundSourceLoc_Handler_Instance.channel_number * AUDIO_REC_SIZE; // # channels x (2ms * freq) * # ptr/channels
   AcousticSL_getMemorySize( &libSoundSourceLoc_Handler_Instance);
   libSoundSourceLoc_Handler_Instance.pInternalMemory=(uint32_t *)malloc(libSoundSourceLoc_Handler_Instance.internal_memory_size);
   error_value += AcousticSL_Init( &libSoundSourceLoc_Handler_Instance);
 
   /*Setup Source Localization dynamic parameters*/
-  libSoundSourceLoc_Config_Instance.resolution=5;
-  libSoundSourceLoc_Config_Instance.threshold=15;
+  libSoundSourceLoc_Config_Instance.resolution = RESOLUTION;
+  libSoundSourceLoc_Config_Instance.threshold = NOISE_THRESHOLD;
   error_value += AcousticSL_setConfig(&libSoundSourceLoc_Handler_Instance, &libSoundSourceLoc_Config_Instance);
   error_value += (libSoundSourceLoc_Handler_Instance.pInternalMemory == NULL);
   return error_value;

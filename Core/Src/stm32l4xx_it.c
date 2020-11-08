@@ -56,10 +56,10 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-extern DMA_HandleTypeDef hdma_dfsdm1_flt0;
 extern DMA_HandleTypeDef hdma_dfsdm1_flt1;
-extern DMA_HandleTypeDef hdma_dfsdm1_flt2;
 extern DMA_HandleTypeDef hdma_dfsdm1_flt3;
+extern DMA_HandleTypeDef hdma_dfsdm1_flt0;
+extern DMA_HandleTypeDef hdma_dfsdm1_flt2;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */

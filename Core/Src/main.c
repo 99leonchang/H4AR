@@ -50,10 +50,10 @@ DFSDM_Channel_HandleTypeDef hdfsdm1_channel0;
 DFSDM_Channel_HandleTypeDef hdfsdm1_channel1;
 DFSDM_Channel_HandleTypeDef hdfsdm1_channel2;
 DFSDM_Channel_HandleTypeDef hdfsdm1_channel3;
-DMA_HandleTypeDef hdma_dfsdm1_flt0;
 DMA_HandleTypeDef hdma_dfsdm1_flt1;
-DMA_HandleTypeDef hdma_dfsdm1_flt2;
 DMA_HandleTypeDef hdma_dfsdm1_flt3;
+DMA_HandleTypeDef hdma_dfsdm1_flt0;
+DMA_HandleTypeDef hdma_dfsdm1_flt2;
 
 /* USER CODE BEGIN PV */
 
@@ -81,6 +81,7 @@ int32_t RecBuf3[AUDIO_REC_SIZE];
 
 volatile int32_t AngleExists;
 volatile int32_t AngleEstimation;
+volatile int32_t RaiseIRQ;
 
 // Whether first half of PlayBuf[i] is ready for acousticSL
 uint8_t PlayHalfReady[MICS] = {0, 0, 0, 0};
@@ -195,6 +196,8 @@ void EXTI1_Callback(void) {
 		AngleExists = 1;
 		AngleEstimation = angle;
 	}
+
+	RaiseIRQ = 0;
 }
 
 /* USER CODE END 0 */
@@ -214,7 +217,9 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  RaiseIRQ = 0;
+  AngleExists = 0;
+  AngleEstimation = 0;
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -266,24 +271,25 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	  int process = 0;
 	  if (IsAllSet(PlayHalfReady, MICS)) {
-		  int16_t *rec0;
+		  int16_t *rec2;
 		  int16_t *rec3;
-		  GetBuffers(0, &rec0, NULL);
+		  GetBuffers(2, &rec2, NULL);
 		  GetBuffers(3, &rec3, NULL);
 		  ClearUI8Buffers(PlayHalfReady, MICS);
 
 		  // TODO: what if more mics
-		  process = Audio_Process_Data_Input(rec0, rec3);
+		  process = Audio_Process_Data_Input(rec2, rec3);
 	  } else if (IsAllSet(PlaySecondHalfReady, MICS)) {
-		  int16_t *rec0;
+		  int16_t *rec2;
 		  int16_t *rec3;
-		  GetBuffers(0, &rec0, NULL);
+		  GetBuffers(2, &rec2, NULL);
 		  GetBuffers(3, &rec3, NULL);
 		  ClearUI8Buffers(PlaySecondHalfReady, MICS);
-		  process = Audio_Process_Data_Input(rec0 + (AUDIO_REC_SIZE/2), rec3 + (AUDIO_REC_SIZE/2));
+		  process = Audio_Process_Data_Input(rec2 + (AUDIO_REC_SIZE/2), rec3 + (AUDIO_REC_SIZE/2));
 	  }
 
 	  if (process) {
+		  RaiseIRQ = 1;
 		  HAL_NVIC_SetPendingIRQ(EXTI1_IRQn);
 	  }
 
@@ -377,8 +383,8 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_filter0.Init.RegularParam.Trigger = DFSDM_FILTER_SW_TRIGGER;
   hdfsdm1_filter0.Init.RegularParam.FastMode = ENABLE;
   hdfsdm1_filter0.Init.RegularParam.DmaMode = ENABLE;
-  hdfsdm1_filter0.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
-  hdfsdm1_filter0.Init.FilterParam.Oversampling = 125;
+  hdfsdm1_filter0.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC5_ORDER;
+  hdfsdm1_filter0.Init.FilterParam.Oversampling = 63;
   hdfsdm1_filter0.Init.FilterParam.IntOversampling = 1;
   if (HAL_DFSDM_FilterInit(&hdfsdm1_filter0) != HAL_OK)
   {
@@ -388,8 +394,8 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_filter1.Init.RegularParam.Trigger = DFSDM_FILTER_SW_TRIGGER;
   hdfsdm1_filter1.Init.RegularParam.FastMode = ENABLE;
   hdfsdm1_filter1.Init.RegularParam.DmaMode = ENABLE;
-  hdfsdm1_filter1.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
-  hdfsdm1_filter1.Init.FilterParam.Oversampling = 125;
+  hdfsdm1_filter1.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC5_ORDER;
+  hdfsdm1_filter1.Init.FilterParam.Oversampling = 63;
   hdfsdm1_filter1.Init.FilterParam.IntOversampling = 1;
   if (HAL_DFSDM_FilterInit(&hdfsdm1_filter1) != HAL_OK)
   {
@@ -399,8 +405,8 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_filter2.Init.RegularParam.Trigger = DFSDM_FILTER_SW_TRIGGER;
   hdfsdm1_filter2.Init.RegularParam.FastMode = ENABLE;
   hdfsdm1_filter2.Init.RegularParam.DmaMode = ENABLE;
-  hdfsdm1_filter2.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
-  hdfsdm1_filter2.Init.FilterParam.Oversampling = 125;
+  hdfsdm1_filter2.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC5_ORDER;
+  hdfsdm1_filter2.Init.FilterParam.Oversampling = 63;
   hdfsdm1_filter2.Init.FilterParam.IntOversampling = 1;
   if (HAL_DFSDM_FilterInit(&hdfsdm1_filter2) != HAL_OK)
   {
@@ -410,8 +416,8 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_filter3.Init.RegularParam.Trigger = DFSDM_FILTER_SW_TRIGGER;
   hdfsdm1_filter3.Init.RegularParam.FastMode = ENABLE;
   hdfsdm1_filter3.Init.RegularParam.DmaMode = ENABLE;
-  hdfsdm1_filter3.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
-  hdfsdm1_filter3.Init.FilterParam.Oversampling = 125;
+  hdfsdm1_filter3.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC5_ORDER;
+  hdfsdm1_filter3.Init.FilterParam.Oversampling = 63;
   hdfsdm1_filter3.Init.FilterParam.IntOversampling = 1;
   if (HAL_DFSDM_FilterInit(&hdfsdm1_filter3) != HAL_OK)
   {
@@ -424,12 +430,12 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel0.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel0.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel0.Init.Input.Pins = DFSDM_CHANNEL_FOLLOWING_CHANNEL_PINS;
-  hdfsdm1_channel0.Init.SerialInterface.Type = DFSDM_CHANNEL_SPI_FALLING;
+  hdfsdm1_channel0.Init.SerialInterface.Type = DFSDM_CHANNEL_SPI_RISING;
   hdfsdm1_channel0.Init.SerialInterface.SpiClock = DFSDM_CHANNEL_SPI_CLOCK_INTERNAL;
   hdfsdm1_channel0.Init.Awd.FilterOrder = DFSDM_CHANNEL_FASTSINC_ORDER;
   hdfsdm1_channel0.Init.Awd.Oversampling = 1;
   hdfsdm1_channel0.Init.Offset = 0;
-  hdfsdm1_channel0.Init.RightBitShift = 0x00;
+  hdfsdm1_channel0.Init.RightBitShift = 0x7;
   if (HAL_DFSDM_ChannelInit(&hdfsdm1_channel0) != HAL_OK)
   {
     Error_Handler();
@@ -441,12 +447,12 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel1.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel1.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel1.Init.Input.Pins = DFSDM_CHANNEL_SAME_CHANNEL_PINS;
-  hdfsdm1_channel1.Init.SerialInterface.Type = DFSDM_CHANNEL_SPI_RISING;
+  hdfsdm1_channel1.Init.SerialInterface.Type = DFSDM_CHANNEL_SPI_FALLING;
   hdfsdm1_channel1.Init.SerialInterface.SpiClock = DFSDM_CHANNEL_SPI_CLOCK_INTERNAL;
   hdfsdm1_channel1.Init.Awd.FilterOrder = DFSDM_CHANNEL_FASTSINC_ORDER;
   hdfsdm1_channel1.Init.Awd.Oversampling = 1;
   hdfsdm1_channel1.Init.Offset = 0;
-  hdfsdm1_channel1.Init.RightBitShift = 0x00;
+  hdfsdm1_channel1.Init.RightBitShift = 0x07;
   if (HAL_DFSDM_ChannelInit(&hdfsdm1_channel1) != HAL_OK)
   {
     Error_Handler();
@@ -458,12 +464,12 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel2.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel2.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel2.Init.Input.Pins = DFSDM_CHANNEL_FOLLOWING_CHANNEL_PINS;
-  hdfsdm1_channel2.Init.SerialInterface.Type = DFSDM_CHANNEL_SPI_FALLING;
+  hdfsdm1_channel2.Init.SerialInterface.Type = DFSDM_CHANNEL_SPI_RISING;
   hdfsdm1_channel2.Init.SerialInterface.SpiClock = DFSDM_CHANNEL_SPI_CLOCK_INTERNAL;
   hdfsdm1_channel2.Init.Awd.FilterOrder = DFSDM_CHANNEL_FASTSINC_ORDER;
   hdfsdm1_channel2.Init.Awd.Oversampling = 1;
   hdfsdm1_channel2.Init.Offset = 0;
-  hdfsdm1_channel2.Init.RightBitShift = 0x00;
+  hdfsdm1_channel2.Init.RightBitShift = 0x7;
   if (HAL_DFSDM_ChannelInit(&hdfsdm1_channel2) != HAL_OK)
   {
     Error_Handler();
@@ -475,12 +481,12 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel3.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel3.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel3.Init.Input.Pins = DFSDM_CHANNEL_SAME_CHANNEL_PINS;
-  hdfsdm1_channel3.Init.SerialInterface.Type = DFSDM_CHANNEL_SPI_RISING;
+  hdfsdm1_channel3.Init.SerialInterface.Type = DFSDM_CHANNEL_SPI_FALLING;
   hdfsdm1_channel3.Init.SerialInterface.SpiClock = DFSDM_CHANNEL_SPI_CLOCK_INTERNAL;
   hdfsdm1_channel3.Init.Awd.FilterOrder = DFSDM_CHANNEL_FASTSINC_ORDER;
   hdfsdm1_channel3.Init.Awd.Oversampling = 1;
   hdfsdm1_channel3.Init.Offset = 0;
-  hdfsdm1_channel3.Init.RightBitShift = 0x00;
+  hdfsdm1_channel3.Init.RightBitShift = 0x7;
   if (HAL_DFSDM_ChannelInit(&hdfsdm1_channel3) != HAL_OK)
   {
     Error_Handler();
