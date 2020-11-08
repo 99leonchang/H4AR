@@ -19,13 +19,12 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "constants.h"
-#include "acoustic_sl.h"
-#include "sound_localizer.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "constants.h"
+#include "acoustic_sl.h"
+#include "sound_localizer.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -96,7 +95,10 @@ int DFSDMFilterToIndex(DFSDM_Filter_HandleTypeDef *hfdfsdm_filter) {
 	if (&hdfsdm1_filter0 == hfdfsdm_filter) return 0;
 	else if (&hdfsdm1_filter1 == hfdfsdm_filter) return 1;
 	else if (&hdfsdm1_filter2 == hfdfsdm_filter) return 2;
-	else return 3;
+	else if (&hdfsdm1_filter3 == hfdfsdm_filter) return 3;
+	else Error_Handler();
+
+	return -1;
 }
 
 DFSDM_Filter_HandleTypeDef* IndexToDFSDMFilter(int index) {
@@ -107,6 +109,8 @@ DFSDM_Filter_HandleTypeDef* IndexToDFSDMFilter(int index) {
 		case 3: return &hdfsdm1_filter3;
 	}
 
+
+	Error_Handler();
 	return NULL;
 }
 
@@ -119,9 +123,7 @@ void HAL_DFSDM_FilterRegConvCpltCallback(DFSDM_Filter_HandleTypeDef *hdfsdm_filt
 }
 
 void HAL_DFSDM_FilterErrorCallback(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	while (1) {
-
-	}
+	Error_Handler();
 }
 
 int IsAllSet(uint8_t *buffer, int n) {
@@ -141,6 +143,7 @@ void GetBuffers(int index, int16_t **playbuf, int32_t **recbuf) {
 		case 1: buffer = PlayBuf1; break;
 		case 2: buffer = PlayBuf2; break;
 		case 3: buffer = PlayBuf3; break;
+		default: Error_Handler(); break;
 	}
 
 	int32_t *recbuffer = 0;
@@ -149,6 +152,7 @@ void GetBuffers(int index, int16_t **playbuf, int32_t **recbuf) {
 		case 1: recbuffer = RecBuf1; break;
 		case 2: recbuffer = RecBuf2; break;
 		case 3: recbuffer = RecBuf3; break;
+		default: Error_Handler(); break;
 	}
 
 	if (playbuf) *playbuf = buffer;
@@ -226,6 +230,10 @@ int main(void)
   MX_DFSDM1_Init();
   /* USER CODE BEGIN 2 */
 
+  // TODO: Don't preempt computing angles -- dubious at best, evil at worst?
+  HAL_NVIC_SetPriority((IRQn_Type)EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ((IRQn_Type)EXTI1_IRQn);
+
   int status = Audio_Libraries_Init(M12_DISTANCE, SAMPLING_FREQUENCY);
 
   for (int i = 0; i < MICS; i++) {
@@ -242,10 +250,6 @@ int main(void)
 	  GetBuffers(i, NULL, &recbuf);
 	  status += HAL_DFSDM_FilterRegularStart_DMA(filter, recbuf, AUDIO_REC_SIZE);
   }
-
-  // TODO: Don't preempt computing angles -- dubious at best, evil at worst?
-  HAL_NVIC_SetPriority((IRQn_Type)EXTI1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ((IRQn_Type)EXTI1_IRQn);
 
   if (status != 0) {
 	  Error_Handler();
@@ -374,7 +378,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_filter0.Init.RegularParam.FastMode = ENABLE;
   hdfsdm1_filter0.Init.RegularParam.DmaMode = ENABLE;
   hdfsdm1_filter0.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
-  hdfsdm1_filter0.Init.FilterParam.Oversampling = 250;
+  hdfsdm1_filter0.Init.FilterParam.Oversampling = 125;
   hdfsdm1_filter0.Init.FilterParam.IntOversampling = 1;
   if (HAL_DFSDM_FilterInit(&hdfsdm1_filter0) != HAL_OK)
   {
@@ -385,7 +389,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_filter1.Init.RegularParam.FastMode = ENABLE;
   hdfsdm1_filter1.Init.RegularParam.DmaMode = ENABLE;
   hdfsdm1_filter1.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
-  hdfsdm1_filter1.Init.FilterParam.Oversampling = 250;
+  hdfsdm1_filter1.Init.FilterParam.Oversampling = 125;
   hdfsdm1_filter1.Init.FilterParam.IntOversampling = 1;
   if (HAL_DFSDM_FilterInit(&hdfsdm1_filter1) != HAL_OK)
   {
@@ -396,7 +400,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_filter2.Init.RegularParam.FastMode = ENABLE;
   hdfsdm1_filter2.Init.RegularParam.DmaMode = ENABLE;
   hdfsdm1_filter2.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
-  hdfsdm1_filter2.Init.FilterParam.Oversampling = 250;
+  hdfsdm1_filter2.Init.FilterParam.Oversampling = 125;
   hdfsdm1_filter2.Init.FilterParam.IntOversampling = 1;
   if (HAL_DFSDM_FilterInit(&hdfsdm1_filter2) != HAL_OK)
   {
@@ -407,7 +411,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_filter3.Init.RegularParam.FastMode = ENABLE;
   hdfsdm1_filter3.Init.RegularParam.DmaMode = ENABLE;
   hdfsdm1_filter3.Init.FilterParam.SincOrder = DFSDM_FILTER_SINC3_ORDER;
-  hdfsdm1_filter3.Init.FilterParam.Oversampling = 250;
+  hdfsdm1_filter3.Init.FilterParam.Oversampling = 125;
   hdfsdm1_filter3.Init.FilterParam.IntOversampling = 1;
   if (HAL_DFSDM_FilterInit(&hdfsdm1_filter3) != HAL_OK)
   {

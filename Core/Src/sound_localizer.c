@@ -43,9 +43,11 @@ uint32_t Audio_Libraries_Init(uint16_t m12_distance, uint32_t freq)
   libSoundSourceLoc_Handler_Instance.algorithm = ACOUSTIC_SL_ALGORITHM_GCCP;
   libSoundSourceLoc_Handler_Instance.ptr_M1_channels = 1;
   libSoundSourceLoc_Handler_Instance.ptr_M2_channels = 1;
-  libSoundSourceLoc_Handler_Instance.samples_to_process = 512;
-  AcousticSL_getMemorySize(&libSoundSourceLoc_Handler_Instance);
-  libSoundSourceLoc_Handler_Instance.pInternalMemory = (uint32_t *)malloc(libSoundSourceLoc_Handler_Instance.internal_memory_size);
+  libSoundSourceLoc_Handler_Instance.ptr_M3_channels = 1;
+  libSoundSourceLoc_Handler_Instance.ptr_M4_channels = 1;
+  libSoundSourceLoc_Handler_Instance.samples_to_process = 64; // # channels x (2ms * freq) * # ptr/channels
+  AcousticSL_getMemorySize( &libSoundSourceLoc_Handler_Instance);
+  libSoundSourceLoc_Handler_Instance.pInternalMemory=(uint32_t *)malloc(libSoundSourceLoc_Handler_Instance.internal_memory_size);
   error_value += AcousticSL_Init( &libSoundSourceLoc_Handler_Instance);
 
   /*Setup Source Localization dynamic parameters*/
