@@ -25,6 +25,7 @@
 #include "constants.h"
 #include "acoustic_sl.h"
 #include "sound_localizer.h"
+#include "oled.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,6 +56,8 @@ DMA_HandleTypeDef hdma_dfsdm1_flt3;
 DMA_HandleTypeDef hdma_dfsdm1_flt0;
 DMA_HandleTypeDef hdma_dfsdm1_flt2;
 
+I2C_HandleTypeDef hi2c3;
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -64,6 +67,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_DFSDM1_Init(void);
+static void MX_I2C3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -233,7 +237,9 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_DFSDM1_Init();
+  MX_I2C3_Init();
   /* USER CODE BEGIN 2 */
+  oled_Init(&hi2c3);
 
   // TODO: Don't preempt computing angles -- dubious at best, evil at worst?
   HAL_NVIC_SetPriority((IRQn_Type)EXTI1_IRQn, 0, 0);
@@ -264,8 +270,11 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  int i = 0;
   while (1)
   {
+	oled_Display(i);
+	if (++i > 7) { i = 0; }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -350,7 +359,8 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_DFSDM1;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_I2C3|RCC_PERIPHCLK_DFSDM1;
+  PeriphClkInit.I2c3ClockSelection = RCC_I2C3CLKSOURCE_PCLK1;
   PeriphClkInit.Dfsdm1ClockSelection = RCC_DFSDM1CLKSOURCE_PCLK;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
@@ -510,6 +520,52 @@ static void MX_DFSDM1_Init(void)
   /* USER CODE BEGIN DFSDM1_Init 2 */
 
   /* USER CODE END DFSDM1_Init 2 */
+
+}
+
+/**
+  * @brief I2C3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C3_Init(void)
+{
+
+  /* USER CODE BEGIN I2C3_Init 0 */
+
+  /* USER CODE END I2C3_Init 0 */
+
+  /* USER CODE BEGIN I2C3_Init 1 */
+
+  /* USER CODE END I2C3_Init 1 */
+  hi2c3.Instance = I2C3;
+  hi2c3.Init.Timing = 0x10909CEC;
+  hi2c3.Init.OwnAddress1 = 0;
+  hi2c3.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c3.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c3.Init.OwnAddress2 = 0;
+  hi2c3.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c3.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c3.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c3, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c3, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C3_Init 2 */
+
+  /* USER CODE END I2C3_Init 2 */
 
 }
 
