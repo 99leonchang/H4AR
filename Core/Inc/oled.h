@@ -10,9 +10,13 @@
 
 #include "ssd1306.h"
 
+/*
 static uint8_t mail816[16] = {
 	0x1F,0xF8,0x10,0x08,0x18,0x18,0x14,0x28,0x13,0xC8,0x10,0x08,0x10,0x08,0x1F,0xF8
   };
+*/
+
+// TODO: Check if removing the &'s is fine
 
 static uint8_t bat816[16] = {
  0x0F,0xFE,0x30,0x02,0x26,0xDA,0x26,0xDA,0x26,0xDA,0x26,0xDA,0x30,0x02,0x0F,0xFE
@@ -137,7 +141,7 @@ static uint8_t arrow_45deg[128] = {
 
 void oled_Init(I2C_HandleTypeDef *hi2c) {
 	ssd1306_Init(hi2c);
-	ssd1306_Bitmap(0, 0, &logo, 64, 32);
+	ssd1306_Bitmap(0, 0, logo, 64, 32);
 	ssd1306_UpdateScreen();
 	// Remove in future
 	HAL_Delay(1000);
@@ -149,31 +153,31 @@ void oled_Init(I2C_HandleTypeDef *hi2c) {
  */
 void oled_Display(uint8_t dir_num) {
 	ssd1306_Fill(Black);
-	ssd1306_Bitmap(48, 0, &bat816, 16, 8);
+	ssd1306_Bitmap(48, 0, bat816, 16, 8);
 	switch (dir_num) {
 		case 0:
-			ssd1306_Bitmap(16, 0, &arrow_0deg, 32, 32);
+			ssd1306_Bitmap(16, 0, arrow_0deg, 32, 32);
 			break;
 		case 1:
-			ssd1306_Bitmap(16, 0, &arrow_45deg, 32, 32);
+			ssd1306_Bitmap(16, 0, arrow_45deg, 32, 32);
 			break;
 		case 2:
-			ssd1306_Bitmap(16, 0, &arrow_90deg, 32, 32);
+			ssd1306_Bitmap(16, 0, arrow_90deg, 32, 32);
 			break;
 		case 3:
-			ssd1306_Bitmap(16, 0, &arrow_135deg, 32, 32);
+			ssd1306_Bitmap(16, 0, arrow_135deg, 32, 32);
 			break;
 		case 4:
-			ssd1306_Bitmap(16, 0, &arrow_180deg, 32, 32);
+			ssd1306_Bitmap(16, 0, arrow_180deg, 32, 32);
 			break;
 		case 5:
-			ssd1306_Bitmap(16, 0, &arrow_225deg, 32, 32);
+			ssd1306_Bitmap(16, 0, arrow_225deg, 32, 32);
 			break;
 		case 6:
-			ssd1306_Bitmap(16, 0, &arrow_270deg, 32, 32);
+			ssd1306_Bitmap(16, 0, arrow_270deg, 32, 32);
 			break;
 		case 7:
-			ssd1306_Bitmap(16, 0, &arrow_315deg, 32, 32);
+			ssd1306_Bitmap(16, 0, arrow_315deg, 32, 32);
 			break;
 		default:
 			break;

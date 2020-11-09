@@ -83,9 +83,22 @@ int32_t RecBuf1[AUDIO_REC_SIZE];
 int32_t RecBuf2[AUDIO_REC_SIZE];
 int32_t RecBuf3[AUDIO_REC_SIZE];
 
+// Offset fixing
+// TODO: Use this for offset-fixing, as needed
+int32_t PlayBufSums[MICS];
+
 volatile int32_t AngleExists;
 volatile int32_t AngleEstimation;
 volatile int32_t RaiseIRQ;
+
+// Smoothing stuff
+volatile int32_t pastEstimatesForSmoothing[SMOOTHING_SAMPLES];
+volatile int32_t currentSmoothingIndex;
+volatile int32_t currentSmoothingSum;
+volatile int32_t currentSmoothingSumOfSquares;
+
+volatile int32_t SmoothedAngleExists;
+volatile int32_t SmoothedAngleEstimation;
 
 // Whether first half of PlayBuf[i] is ready for acousticSL
 uint8_t PlayHalfReady[MICS] = {0, 0, 0, 0};
@@ -170,6 +183,12 @@ void ClearUI8Buffers(uint8_t *buffer, int n) {
 	}
 }
 
+void ClearI32Buffers(volatile int32_t *buffer, int n) {
+	for (int i = 0; i < n; i++) {
+		buffer[i] = 0;
+	}
+}
+
 void ClearBuffers(int offset) {
 	int16_t *playbuf;
 	int32_t *recbuf;
@@ -191,17 +210,43 @@ void TransferBuffers(int offset, int low, int high) {
 	}
 }
 
+// TODO: Need to lock the volatile stuff?
 void EXTI1_Callback(void) {
 	Audio_ProcessAngle();
 	int32_t angle = Audio_GetAngle();
 	if (angle == ACOUSTIC_SL_NO_AUDIO_DETECTED) {
 		AngleExists = 0;
+		AngleEstimation = 1000;
 	} else {
 		AngleExists = 1;
 		AngleEstimation = angle;
 	}
-
+	// Smoothing stuff
+	currentSmoothingSum -= pastEstimatesForSmoothing[currentSmoothingIndex];
+	currentSmoothingSumOfSquares -= pastEstimatesForSmoothing[currentSmoothingIndex] * pastEstimatesForSmoothing[currentSmoothingIndex];
+	currentSmoothingSum += AngleEstimation;
+	currentSmoothingSumOfSquares += AngleEstimation * AngleEstimation;
+	pastEstimatesForSmoothing[currentSmoothingIndex] = AngleEstimation;
+	currentSmoothingIndex++;
+	int mean = currentSmoothingSum / SMOOTHING_SAMPLES;
+	int variance = currentSmoothingSumOfSquares / SMOOTHING_SAMPLES - mean * mean;
+	if (variance < SMOOTHING_THRESHOLD * SMOOTHING_THRESHOLD) {
+		SmoothedAngleExists = AngleExists;
+		SmoothedAngleEstimation = AngleEstimation;
+	}
+	else {
+		SmoothedAngleExists = 0;
+		SmoothedAngleEstimation = 1000;
+	}
 	RaiseIRQ = 0;
+}
+
+// TODO: Check if angle is measured anticlockwise from x-axis
+// TODO: Update this when covering 360 degree range
+uint8_t angleToDirectionNumber(int32_t exists, int32_t estimation) {
+	if (!exists) return 8;
+	estimation += 90;
+	return estimation / 45;
 }
 
 /* USER CODE END 0 */
@@ -224,6 +269,13 @@ int main(void)
   RaiseIRQ = 0;
   AngleExists = 0;
   AngleEstimation = 0;
+
+  // Initialize smoothing stuff
+  ClearI32Buffers(pastEstimatesForSmoothing, SMOOTHING_SAMPLES);
+  ClearI32Buffers(PlayBufSums, MICS);
+  currentSmoothingIndex = 0;
+  currentSmoothingSum = 0;
+  currentSmoothingSumOfSquares = 0;
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -270,11 +322,9 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  int i = 0;
   while (1)
   {
-	oled_Display(i);
-	if (++i > 7) { i = 0; }
+	// oled_Display(angleToDirectionNumber(AngleExists, AngleEstimation));
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -289,6 +339,8 @@ int main(void)
 		  // TODO: what if more mics
 		  process = Audio_Process_Data_Input(rec2, rec3);
 	  } else if (IsAllSet(PlaySecondHalfReady, MICS)) {
+		  // TODO: It never seems to go in here (might be problem on my end, but should check)?
+		  // Error_Handler();
 		  int16_t *rec2;
 		  int16_t *rec3;
 		  GetBuffers(2, &rec2, NULL);

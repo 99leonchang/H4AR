@@ -20,4 +20,7 @@
 #define RESOLUTION (5)
 #define NOISE_THRESHOLD (5)
 
+#define SMOOTHING_SAMPLES (5)
+#define SMOOTHING_THRESHOLD (8)
+
 #endif /* INC_CONSTANTS_H_ */
