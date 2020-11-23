@@ -15,10 +15,10 @@
 
 #define MICS 4
 
-#define M12_DISTANCE (1000)
+#define M12_DISTANCE (1150)
 
 #define RESOLUTION (5)
-#define NOISE_THRESHOLD (5)
+#define NOISE_THRESHOLD (1)
 
 #define SMOOTHING_SAMPLES (5)
 #define SMOOTHING_THRESHOLD (8)

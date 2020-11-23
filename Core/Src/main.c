@@ -87,18 +87,38 @@ int32_t RecBuf3[AUDIO_REC_SIZE];
 // TODO: Use this for offset-fixing, as needed
 int32_t PlayBufSums[MICS];
 
-volatile int32_t AngleExists;
-volatile int32_t AngleEstimation;
+volatile int32_t AngleExists0;
+volatile int32_t AngleExists1;
+volatile int32_t AngleRaw0;
+volatile int32_t AngleRaw1;
+
+volatile int32_t AngleEstimation00;
+volatile int32_t AngleEstimation01;
+volatile int32_t AngleEstimation10;
+volatile int32_t AngleEstimation11;
 volatile int32_t RaiseIRQ;
 
-// Smoothing stuff
-volatile int32_t pastEstimatesForSmoothing[SMOOTHING_SAMPLES];
-volatile int32_t currentSmoothingIndex;
-volatile int32_t currentSmoothingSum;
-volatile int32_t currentSmoothingSumOfSquares;
+volatile int32_t IsConvergence;
+volatile int32_t ConvergenceAngle;
 
-volatile int32_t SmoothedAngleExists;
-volatile int32_t SmoothedAngleEstimation;
+// Smoothing stuff
+volatile int32_t pastEstimatesForSmoothing[2][SMOOTHING_SAMPLES];
+volatile int32_t currentSmoothingIndex[2];
+volatile int32_t currentSmoothingSum[2];
+volatile int32_t currentSmoothingSumOfSquares[2];
+
+volatile int32_t pastEstimatesForSmoothingConvergence[SMOOTHING_SAMPLES];
+volatile int32_t currentSmoothingIndexConvergence;
+volatile int32_t currentSmoothingSumConvergence;
+volatile int32_t currentSmoothingSumOfSquaresConvergence;
+
+volatile int32_t SmoothedAngleExists0;
+volatile int32_t SmoothedAngleExists1;
+volatile int32_t SmoothedAngleEstimation0;
+volatile int32_t SmoothedAngleEstimation1;
+
+volatile int32_t SmoothedConvergenceExists;
+volatile int32_t SmoothedConvergenceAngle;
 
 // Whether first half of PlayBuf[i] is ready for acousticSL
 uint8_t PlayHalfReady[MICS] = {0, 0, 0, 0};
@@ -126,7 +146,6 @@ DFSDM_Filter_HandleTypeDef* IndexToDFSDMFilter(int index) {
 		case 2: return &hdfsdm1_filter2;
 		case 3: return &hdfsdm1_filter3;
 	}
-
 
 	Error_Handler();
 	return NULL;
@@ -199,6 +218,26 @@ void ClearBuffers(int offset) {
 	}
 }
 
+int GetOffsets(int offset) {
+	// If you think you know what you want to do here,
+	// you probably don't. Never change these numbers
+	// unless you want to fail.
+	//
+	// - :eyes:
+	switch (offset) {
+	case 0:
+		return 465;
+	case 1:
+		return 349;
+	case 2:
+		return 423;
+	case 3:
+		return 600;
+	default:
+		return 0;
+	}
+}
+
 void TransferBuffers(int offset, int low, int high) {
 	int16_t *buffer;
 	int32_t *recbuffer;
@@ -206,39 +245,8 @@ void TransferBuffers(int offset, int low, int high) {
 
 	// acousticSL only wants 16 bits
 	for (uint16_t i = low; i < high; i++) {
-		buffer[i] = recbuffer[i] >> 16;
+		buffer[i] = (recbuffer[i] >> 16) - GetOffsets(offset);
 	}
-}
-
-// TODO: Need to lock the volatile stuff?
-void EXTI1_Callback(void) {
-	Audio_ProcessAngle();
-	int32_t angle = Audio_GetAngle();
-	if (angle == ACOUSTIC_SL_NO_AUDIO_DETECTED) {
-		AngleExists = 0;
-		AngleEstimation = 1000;
-	} else {
-		AngleExists = 1;
-		AngleEstimation = angle;
-	}
-	// Smoothing stuff
-	currentSmoothingSum -= pastEstimatesForSmoothing[currentSmoothingIndex];
-	currentSmoothingSumOfSquares -= pastEstimatesForSmoothing[currentSmoothingIndex] * pastEstimatesForSmoothing[currentSmoothingIndex];
-	currentSmoothingSum += AngleEstimation;
-	currentSmoothingSumOfSquares += AngleEstimation * AngleEstimation;
-	pastEstimatesForSmoothing[currentSmoothingIndex] = AngleEstimation;
-	currentSmoothingIndex++;
-	int mean = currentSmoothingSum / SMOOTHING_SAMPLES;
-	int variance = currentSmoothingSumOfSquares / SMOOTHING_SAMPLES - mean * mean;
-	if (variance < SMOOTHING_THRESHOLD * SMOOTHING_THRESHOLD) {
-		SmoothedAngleExists = AngleExists;
-		SmoothedAngleEstimation = AngleEstimation;
-	}
-	else {
-		SmoothedAngleExists = 0;
-		SmoothedAngleEstimation = 1000;
-	}
-	RaiseIRQ = 0;
 }
 
 // TODO: Check if angle is measured anticlockwise from x-axis
@@ -246,7 +254,122 @@ void EXTI1_Callback(void) {
 uint8_t angleToDirectionNumber(int32_t exists, int32_t estimation) {
 	if (!exists) return 8;
 	estimation += 90;
-	return estimation / 45;
+	return 3 - (estimation / 45);
+}
+
+// TODO: Need to lock the volatile stuff?
+void EXTI1_Callback(void) {
+	if (RaiseIRQ & 1) {
+		Audio_ProcessAngle(0);
+		int32_t angle = Audio_GetAngle(0);
+		if (angle == ACOUSTIC_SL_NO_AUDIO_DETECTED) {
+			AngleExists0 = 0;
+		} else {
+			AngleExists0 = 1;
+			AngleRaw0 = angle;
+
+		}
+	}
+
+	if (RaiseIRQ & 2) {
+		Audio_ProcessAngle(1);
+		int32_t angle = Audio_GetAngle(1);
+		if (angle == ACOUSTIC_SL_NO_AUDIO_DETECTED) {
+			AngleExists1 = 0;
+		} else {
+			AngleExists1 = 1;
+			AngleRaw1 = angle;
+		}
+	}
+
+	int32_t input[2] = {AngleRaw0, AngleRaw1};
+	int32_t exists[2] = {AngleExists0, AngleExists1};
+	volatile int32_t *smoothExists[2] = {&SmoothedAngleExists0, &SmoothedAngleExists1};
+	volatile int32_t *smoothAngle[2] = {&SmoothedAngleEstimation0, &SmoothedAngleEstimation1};
+	for (int i = 0; i < 2; i++) {
+		if (!exists[i]) {
+			*(smoothExists[i]) = 0;
+			continue;
+		}
+
+		// Smoothing stuff
+		int32_t AngleEstimation = input[i];
+		currentSmoothingSum[i] -= pastEstimatesForSmoothing[i][currentSmoothingIndex[i]];
+		currentSmoothingSumOfSquares[i] -= pastEstimatesForSmoothing[i][currentSmoothingIndex[i]] * pastEstimatesForSmoothing[i][currentSmoothingIndex[i]];
+		currentSmoothingSum[i] += AngleEstimation;
+		currentSmoothingSumOfSquares[i] += AngleEstimation * AngleEstimation;
+		pastEstimatesForSmoothing[i][currentSmoothingIndex[i]] = AngleEstimation;
+		currentSmoothingIndex[i] = (currentSmoothingIndex[i] + 1) % SMOOTHING_SAMPLES;
+		int mean = currentSmoothingSum[i] / SMOOTHING_SAMPLES;
+		int variance = currentSmoothingSumOfSquares[i] / SMOOTHING_SAMPLES - mean * mean;
+		if (variance < SMOOTHING_THRESHOLD * SMOOTHING_THRESHOLD) {
+			*(smoothExists[i]) = 1;
+			*(smoothAngle[i]) = mean;
+		}
+		else {
+			*(smoothExists[i]) = 0;
+		}
+	}
+
+	if (SmoothedAngleExists0 && SmoothedAngleExists1) {
+		AngleEstimation00 = (((90 - SmoothedAngleEstimation0) - 126) + 720) % 360;
+		AngleEstimation01 = (((-90 + SmoothedAngleEstimation0) - 126) + 720) % 360;
+		AngleEstimation10 = ((90 - SmoothedAngleEstimation1) + 720) % 360;
+		AngleEstimation11 = ((-90 + SmoothedAngleEstimation1) + 720) % 360;
+
+		IsConvergence = 1;
+		int32_t numbers[4] = {AngleEstimation00, AngleEstimation01, AngleEstimation10, AngleEstimation11};
+		int32_t minDiff = 360;
+		int32_t avg = 0;
+		for (int i = 0; i < 2; i++) {
+			for (int j = 2; j < 4; j++) {
+				int32_t diff = numbers[j] - numbers[i];
+				if (diff < 0) diff = -diff;
+
+				int32_t diff1 = diff % 360;
+				int32_t diff2 = (360 - diff) % 360;
+				int32_t trueDiff = (diff1 < diff2) ? diff1 : diff2;
+				if (trueDiff < minDiff) {
+					minDiff = trueDiff;
+
+					if (diff > 180) {
+						avg = (numbers[j] < numbers[i]) ? numbers[i] : numbers[j];
+						avg = (avg + minDiff/2) % 360;
+					} else {
+						avg = (numbers[j] < numbers[i]) ? numbers[j] : numbers[i];
+						avg += (minDiff / 2);
+					}
+				}
+			}
+		}
+		ConvergenceAngle = avg;
+	} else {
+		IsConvergence = 0;
+	}
+
+	if (IsConvergence) {
+		int32_t AngleEstimation = ConvergenceAngle;
+		currentSmoothingSumConvergence -= pastEstimatesForSmoothingConvergence[currentSmoothingIndexConvergence];
+		currentSmoothingSumOfSquaresConvergence -= pastEstimatesForSmoothingConvergence[currentSmoothingIndexConvergence] * pastEstimatesForSmoothingConvergence[currentSmoothingIndexConvergence];
+		currentSmoothingSumConvergence += AngleEstimation;
+		currentSmoothingSumOfSquaresConvergence += AngleEstimation * AngleEstimation;
+		pastEstimatesForSmoothingConvergence[currentSmoothingIndexConvergence] = AngleEstimation;
+		currentSmoothingIndexConvergence = (currentSmoothingIndexConvergence + 1) % SMOOTHING_SAMPLES;
+		int mean = currentSmoothingSumConvergence / SMOOTHING_SAMPLES;
+		int variance = currentSmoothingSumOfSquaresConvergence / SMOOTHING_SAMPLES - mean * mean;
+		if (variance < SMOOTHING_THRESHOLD * SMOOTHING_THRESHOLD) {
+			SmoothedConvergenceExists = 1;
+			SmoothedConvergenceAngle = mean;
+		}
+		else {
+			SmoothedConvergenceExists = 0;
+		}
+	} else {
+		SmoothedConvergenceExists = 0;
+	}
+
+
+	RaiseIRQ = 0;
 }
 
 /* USER CODE END 0 */
@@ -267,15 +390,27 @@ int main(void)
 
   /* USER CODE BEGIN Init */
   RaiseIRQ = 0;
-  AngleExists = 0;
-  AngleEstimation = 0;
+  AngleExists0 = 0;
+  AngleEstimation00 = 0;
+  AngleEstimation01 = 0;
+  AngleExists1 = 0;
+  AngleEstimation10 = 0;
+  AngleEstimation11 = 0;
 
   // Initialize smoothing stuff
-  ClearI32Buffers(pastEstimatesForSmoothing, SMOOTHING_SAMPLES);
+  ClearI32Buffers(pastEstimatesForSmoothing[0], SMOOTHING_SAMPLES);
+  ClearI32Buffers(pastEstimatesForSmoothing[1], SMOOTHING_SAMPLES);
   ClearI32Buffers(PlayBufSums, MICS);
-  currentSmoothingIndex = 0;
-  currentSmoothingSum = 0;
-  currentSmoothingSumOfSquares = 0;
+  for (int i = 0; i < 2; i++) {
+	currentSmoothingIndex[i] = 0;
+	currentSmoothingSum[i] = 0;
+	currentSmoothingSumOfSquares[i] = 0;
+  }
+
+  ClearI32Buffers(pastEstimatesForSmoothingConvergence, SMOOTHING_SAMPLES);
+  currentSmoothingIndexConvergence = 0;
+  currentSmoothingSumConvergence = 0;
+  currentSmoothingSumOfSquaresConvergence = 0;
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -322,35 +457,51 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  int lastAngle = 0;
   while (1)
   {
-	// oled_Display(angleToDirectionNumber(AngleExists, AngleEstimation));
+	  /*
+	  int delta = angleToDirectionNumber(AngleExists, AngleEstimation);
+	  if (AngleExists && delta != lastAngle) {
+		  lastAngle = delta;
+		  oled_Display(lastAngle);
+	   }
+	   */
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  int process = 0;
+	  RaiseIRQ = 0;
 	  if (IsAllSet(PlayHalfReady, MICS)) {
+		  int16_t *rec0;
+		  int16_t *rec1;
 		  int16_t *rec2;
 		  int16_t *rec3;
+		  GetBuffers(0, &rec0, NULL);
+		  GetBuffers(1, &rec1, NULL);
 		  GetBuffers(2, &rec2, NULL);
 		  GetBuffers(3, &rec3, NULL);
 		  ClearUI8Buffers(PlayHalfReady, MICS);
 
-		  // TODO: what if more mics
-		  process = Audio_Process_Data_Input(rec2, rec3);
+		  RaiseIRQ = 0;
+		  RaiseIRQ |= Audio_Process_Data_Input(0, rec0, rec1);
+		  RaiseIRQ |= (Audio_Process_Data_Input(1, rec2, rec3) << 1);
 	  } else if (IsAllSet(PlaySecondHalfReady, MICS)) {
-		  // TODO: It never seems to go in here (might be problem on my end, but should check)?
-		  // Error_Handler();
+		  int16_t *rec0;
+		  int16_t *rec1;
 		  int16_t *rec2;
 		  int16_t *rec3;
+		  GetBuffers(0, &rec0, NULL);
+		  GetBuffers(1, &rec1, NULL);
 		  GetBuffers(2, &rec2, NULL);
 		  GetBuffers(3, &rec3, NULL);
 		  ClearUI8Buffers(PlaySecondHalfReady, MICS);
-		  process = Audio_Process_Data_Input(rec2 + (AUDIO_REC_SIZE/2), rec3 + (AUDIO_REC_SIZE/2));
+
+		  RaiseIRQ = 0;
+		  RaiseIRQ |= Audio_Process_Data_Input(0, rec0 + (AUDIO_REC_SIZE/2), rec1 + (AUDIO_REC_SIZE/2));
+		  RaiseIRQ |= (Audio_Process_Data_Input(1, rec2 + (AUDIO_REC_SIZE/2), rec3 + (AUDIO_REC_SIZE/2)) << 1);
 	  }
 
-	  if (process) {
-		  RaiseIRQ = 1;
+	  if (RaiseIRQ) {
 		  HAL_NVIC_SetPendingIRQ(EXTI1_IRQn);
 	  }
 
