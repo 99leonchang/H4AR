@@ -13,10 +13,13 @@
 /*Handler and Config structure for Source Localization*/
 AcousticSL_Handler_t libSoundSourceLoc_Handler_Instance0;
 AcousticSL_Handler_t libSoundSourceLoc_Handler_Instance1;
+AcousticSL_Handler_t libSoundSourceLoc_Handler_Instance2;
 AcousticSL_Config_t  libSoundSourceLoc_Config_Instance0;
 AcousticSL_Config_t  libSoundSourceLoc_Config_Instance1;
+AcousticSL_Config_t  libSoundSourceLoc_Config_Instance2;
 volatile int32_t angle0;
 volatile int32_t angle1;
+volatile int32_t angle2;
 
 /**
 * @brief  AudioSL Data Input
@@ -27,9 +30,12 @@ volatile int32_t angle1;
 int Audio_Process_Data_Input(int instance, int16_t *buf1, int16_t *buf2) {
 	if (instance == 0)
 		return AcousticSL_Data_Input(buf1, buf2, NULL, NULL, &libSoundSourceLoc_Handler_Instance0);
-	else
+	else if (instance == 1)
 		return AcousticSL_Data_Input(buf1, buf2, NULL, NULL, &libSoundSourceLoc_Handler_Instance1);
+	else
+		return AcousticSL_Data_Input(buf1, buf2, NULL, NULL, &libSoundSourceLoc_Handler_Instance2);
 }
+
 
 /**
 * @brief  Initialize the audio libraries adopted
@@ -43,8 +49,8 @@ uint32_t Audio_Libraries_Init(uint16_t m12_distance, uint32_t freq)
   /* Enable CRC peripheral to unlock the library */
   __CRC_CLK_ENABLE();
 
-  AcousticSL_Handler_t* ins[2] = {&libSoundSourceLoc_Handler_Instance0, &libSoundSourceLoc_Handler_Instance1};
-  for (int i = 0; i < 2; i++) {
+  AcousticSL_Handler_t* ins[3] = {&libSoundSourceLoc_Handler_Instance0, &libSoundSourceLoc_Handler_Instance1, &libSoundSourceLoc_Handler_Instance2};
+  for (int i = 0; i < 3; i++) {
 	  AcousticSL_Handler_t* libSoundSourceLoc_Handler_Instance = ins[i];
 	  /*Setup Source Localization static parameters*/
 	  libSoundSourceLoc_Handler_Instance->channel_number = 2;
@@ -62,8 +68,8 @@ uint32_t Audio_Libraries_Init(uint16_t m12_distance, uint32_t freq)
 	  error_value += AcousticSL_Init(libSoundSourceLoc_Handler_Instance);
   }
 
-  AcousticSL_Config_t* config[2] = {&libSoundSourceLoc_Config_Instance0, &libSoundSourceLoc_Config_Instance1};
-  for (int i = 0; i < 2; i++) {
+  AcousticSL_Config_t* config[3] = {&libSoundSourceLoc_Config_Instance0, &libSoundSourceLoc_Config_Instance1, &libSoundSourceLoc_Config_Instance2};
+  for (int i = 0; i < 3; i++) {
 	  AcousticSL_Config_t* libSoundSourceLoc_Config_Instance = config[i];
 	  libSoundSourceLoc_Config_Instance->resolution = RESOLUTION;
 	  libSoundSourceLoc_Config_Instance->threshold = NOISE_THRESHOLD;
@@ -78,13 +84,17 @@ uint32_t Audio_Libraries_Init(uint16_t m12_distance, uint32_t freq)
 void Audio_ProcessAngle(int instance) {
   if (instance == 0)
 	  (void)AcousticSL_Process((int32_t *)&angle0, &libSoundSourceLoc_Handler_Instance0);
-  else
+  else if (instance == 1)
 	  (void)AcousticSL_Process((int32_t *)&angle1, &libSoundSourceLoc_Handler_Instance1);
+  else
+	  (void)AcousticSL_Process((int32_t *)&angle2, &libSoundSourceLoc_Handler_Instance2);
 }
 
 int32_t Audio_GetAngle(int instance) {
 	if (instance == 0)
 		return angle0;
-	else
+	else if (instance == 1)
 		return angle1;
+	else
+		return angle2;
 }

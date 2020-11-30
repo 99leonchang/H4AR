@@ -1,5 +1,5 @@
 #MicroXplorer Configuration settings - do not modify
-DFSDM1.Divider=40
+DFSDM1.Divider=80
 DFSDM1.DmaMode_reg_FIL0=ENABLE
 DFSDM1.DmaMode_reg_FIL1=ENABLE
 DFSDM1.DmaMode_reg_FIL2=ENABLE
@@ -78,8 +78,9 @@ Dma.Request3=DFSDM1_FLT2
 Dma.RequestsNb=4
 File.Version=6
 GPIO.groupedBy=Group By Peripherals
-I2C3.IPParameters=Timing
-I2C3.Timing=0x10909CEC
+I2C3.I2C_Speed_Mode=I2C_Fast_Plus
+I2C3.IPParameters=Timing,I2C_Speed_Mode
+I2C3.Timing=0x00300F33
 KeepUserPlacement=false
 Mcu.Family=STM32L4
 Mcu.IP0=DFSDM1

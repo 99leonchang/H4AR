@@ -89,23 +89,27 @@ int32_t PlayBufSums[MICS];
 
 volatile int32_t AngleExists0;
 volatile int32_t AngleExists1;
+volatile int32_t AngleExists2;
 volatile int32_t AngleRaw0;
 volatile int32_t AngleRaw1;
+volatile int32_t AngleRaw2;
 
 volatile int32_t AngleEstimation00;
 volatile int32_t AngleEstimation01;
 volatile int32_t AngleEstimation10;
 volatile int32_t AngleEstimation11;
+volatile int32_t AngleEstimation20;
+volatile int32_t AngleEstimation21;
 volatile int32_t RaiseIRQ;
 
 volatile int32_t IsConvergence;
 volatile int32_t ConvergenceAngle;
 
 // Smoothing stuff
-volatile int32_t pastEstimatesForSmoothing[2][SMOOTHING_SAMPLES];
-volatile int32_t currentSmoothingIndex[2];
-volatile int32_t currentSmoothingSum[2];
-volatile int32_t currentSmoothingSumOfSquares[2];
+volatile int32_t pastEstimatesForSmoothing[3][SMOOTHING_SAMPLES];
+volatile int32_t currentSmoothingIndex[3];
+volatile int32_t currentSmoothingSum[3];
+volatile int32_t currentSmoothingSumOfSquares[3];
 
 volatile int32_t pastEstimatesForSmoothingConvergence[SMOOTHING_SAMPLES];
 volatile int32_t currentSmoothingIndexConvergence;
@@ -114,11 +118,14 @@ volatile int32_t currentSmoothingSumOfSquaresConvergence;
 
 volatile int32_t SmoothedAngleExists0;
 volatile int32_t SmoothedAngleExists1;
+volatile int32_t SmoothedAngleExists2;
 volatile int32_t SmoothedAngleEstimation0;
 volatile int32_t SmoothedAngleEstimation1;
+volatile int32_t SmoothedAngleEstimation2;
 
 volatile int32_t SmoothedConvergenceExists;
 volatile int32_t SmoothedConvergenceAngle;
+volatile int32_t SmootherConvergenceAngle;
 
 // Whether first half of PlayBuf[i] is ready for acousticSL
 uint8_t PlayHalfReady[MICS] = {0, 0, 0, 0};
@@ -152,11 +159,13 @@ DFSDM_Filter_HandleTypeDef* IndexToDFSDMFilter(int index) {
 }
 
 void HAL_DFSDM_FilterRegConvHalfCpltCallback(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	DmaRecHalfBuffComplete[DFSDMFilterToIndex(hdfsdm_filter)] = 1;
+	int filter = DFSDMFilterToIndex(hdfsdm_filter);
+	DmaRecHalfBuffComplete[filter] = 1;
 }
 
 void HAL_DFSDM_FilterRegConvCpltCallback(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
-	DmaRecBuffComplete[DFSDMFilterToIndex(hdfsdm_filter)] = 1;
+	int filter = DFSDMFilterToIndex(hdfsdm_filter);
+	DmaRecBuffComplete[filter] = 1;
 }
 
 void HAL_DFSDM_FilterErrorCallback(DFSDM_Filter_HandleTypeDef *hdfsdm_filter) {
@@ -282,10 +291,23 @@ void EXTI1_Callback(void) {
 		}
 	}
 
-	int32_t input[2] = {AngleRaw0, AngleRaw1};
-	int32_t exists[2] = {AngleExists0, AngleExists1};
-	volatile int32_t *smoothExists[2] = {&SmoothedAngleExists0, &SmoothedAngleExists1};
-	volatile int32_t *smoothAngle[2] = {&SmoothedAngleEstimation0, &SmoothedAngleEstimation1};
+	/*
+	if (RaiseIRQ & 4) {
+		Audio_ProcessAngle(2);
+		int32_t angle = Audio_GetAngle(2);
+		if (angle == ACOUSTIC_SL_NO_AUDIO_DETECTED) {
+			AngleExists2 = 0;
+		} else {
+			AngleExists2 = 1;
+			AngleRaw2 = angle;
+		}
+	}
+	*/
+
+	int32_t input[3] = {AngleRaw0, AngleRaw1, AngleRaw2};
+	int32_t exists[3] = {AngleExists0, AngleExists1, AngleExists2};
+	volatile int32_t *smoothExists[3] = {&SmoothedAngleExists0, &SmoothedAngleExists1, &SmoothedAngleExists2};
+	volatile int32_t *smoothAngle[3] = {&SmoothedAngleEstimation0, &SmoothedAngleEstimation1, &SmoothedAngleEstimation2};
 	for (int i = 0; i < 2; i++) {
 		if (!exists[i]) {
 			*(smoothExists[i]) = 0;
@@ -311,18 +333,22 @@ void EXTI1_Callback(void) {
 		}
 	}
 
-	if (SmoothedAngleExists0 && SmoothedAngleExists1) {
-		AngleEstimation00 = (((90 - SmoothedAngleEstimation0) - 126) + 720) % 360;
-		AngleEstimation01 = (((-90 + SmoothedAngleEstimation0) - 126) + 720) % 360;
-		AngleEstimation10 = ((90 - SmoothedAngleEstimation1) + 720) % 360;
-		AngleEstimation11 = ((-90 + SmoothedAngleEstimation1) + 720) % 360;
+	if (SmoothedAngleExists0 && SmoothedAngleExists1 /*&& SmoothedAngleExists2 */) {
+		AngleEstimation00 = (((-90 + MIC_OFFSET - SmoothedAngleEstimation0) + 720) % 360);
+		AngleEstimation01 = (((90 + MIC_OFFSET + SmoothedAngleEstimation0) + 720) % 360);
+		AngleEstimation10 = (((90 - MIC_OFFSET - SmoothedAngleEstimation1) + 720) % 360);
+		AngleEstimation11 = (((270 - MIC_OFFSET + SmoothedAngleEstimation1) + 720) % 360);
+		AngleEstimation20 = ((SmoothedAngleEstimation2 + 720) % 360);
+		AngleEstimation21 = ((180 - SmoothedAngleEstimation2 + 720) % 360);
 
 		IsConvergence = 1;
-		int32_t numbers[4] = {AngleEstimation00, AngleEstimation01, AngleEstimation10, AngleEstimation11};
+		int32_t numbers[6] = {AngleEstimation00, AngleEstimation01, AngleEstimation10, AngleEstimation11, AngleEstimation20, AngleEstimation21};
 		int32_t minDiff = 360;
 		int32_t avg = 0;
 		for (int i = 0; i < 2; i++) {
-			for (int j = 2; j < 4; j++) {
+			//int j = (i / 2) * 2 + 2;
+			int j = 2;
+			for (; j < 4; j++) {
 				int32_t diff = numbers[j] - numbers[i];
 				if (diff < 0) diff = -diff;
 
@@ -343,10 +369,16 @@ void EXTI1_Callback(void) {
 			}
 		}
 		ConvergenceAngle = avg;
+		if (ConvergenceAngle < 180) {
+			SmootherConvergenceAngle = AngleEstimation10;
+		} else {
+			SmootherConvergenceAngle = AngleEstimation00;
+		}
 	} else {
 		IsConvergence = 0;
 	}
 
+	/*
 	if (IsConvergence) {
 		int32_t AngleEstimation = ConvergenceAngle;
 		currentSmoothingSumConvergence -= pastEstimatesForSmoothingConvergence[currentSmoothingIndexConvergence];
@@ -367,7 +399,7 @@ void EXTI1_Callback(void) {
 	} else {
 		SmoothedConvergenceExists = 0;
 	}
-
+	*/
 
 	RaiseIRQ = 0;
 }
@@ -396,12 +428,16 @@ int main(void)
   AngleExists1 = 0;
   AngleEstimation10 = 0;
   AngleEstimation11 = 0;
+  AngleExists2 = 0;
+  AngleEstimation20 = 0;
+  AngleEstimation21 = 0;
 
   // Initialize smoothing stuff
   ClearI32Buffers(pastEstimatesForSmoothing[0], SMOOTHING_SAMPLES);
   ClearI32Buffers(pastEstimatesForSmoothing[1], SMOOTHING_SAMPLES);
+  ClearI32Buffers(pastEstimatesForSmoothing[2], SMOOTHING_SAMPLES);
   ClearI32Buffers(PlayBufSums, MICS);
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 3; i++) {
 	currentSmoothingIndex[i] = 0;
 	currentSmoothingSum[i] = 0;
 	currentSmoothingSumOfSquares[i] = 0;
@@ -483,8 +519,9 @@ int main(void)
 		  ClearUI8Buffers(PlayHalfReady, MICS);
 
 		  RaiseIRQ = 0;
-		  RaiseIRQ |= Audio_Process_Data_Input(0, rec0, rec1);
-		  RaiseIRQ |= (Audio_Process_Data_Input(1, rec2, rec3) << 1);
+		  RaiseIRQ |= Audio_Process_Data_Input(0, rec3, rec2);
+		  RaiseIRQ |= (Audio_Process_Data_Input(1, rec1, rec0) << 1);
+		  // RaiseIRQ |= (Audio_Process_Data_Input(2, rec0, rec3) << 2);
 	  } else if (IsAllSet(PlaySecondHalfReady, MICS)) {
 		  int16_t *rec0;
 		  int16_t *rec1;
@@ -497,8 +534,9 @@ int main(void)
 		  ClearUI8Buffers(PlaySecondHalfReady, MICS);
 
 		  RaiseIRQ = 0;
-		  RaiseIRQ |= Audio_Process_Data_Input(0, rec0 + (AUDIO_REC_SIZE/2), rec1 + (AUDIO_REC_SIZE/2));
-		  RaiseIRQ |= (Audio_Process_Data_Input(1, rec2 + (AUDIO_REC_SIZE/2), rec3 + (AUDIO_REC_SIZE/2)) << 1);
+		  RaiseIRQ |= Audio_Process_Data_Input(0, rec3 + (AUDIO_REC_SIZE/2), rec2 + (AUDIO_REC_SIZE/2));
+		  RaiseIRQ |= (Audio_Process_Data_Input(1, rec1 + (AUDIO_REC_SIZE/2), rec0 + (AUDIO_REC_SIZE/2)) << 1);
+		  // RaiseIRQ |= (Audio_Process_Data_Input(2, rec0 + (AUDIO_REC_SIZE/2), rec3 + (AUDIO_REC_SIZE/2)) << 2);
 	  }
 
 	  if (RaiseIRQ) {
@@ -639,7 +677,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel0.Instance = DFSDM1_Channel0;
   hdfsdm1_channel0.Init.OutputClock.Activation = ENABLE;
   hdfsdm1_channel0.Init.OutputClock.Selection = DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
-  hdfsdm1_channel0.Init.OutputClock.Divider = 40;
+  hdfsdm1_channel0.Init.OutputClock.Divider = 80;
   hdfsdm1_channel0.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel0.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel0.Init.Input.Pins = DFSDM_CHANNEL_FOLLOWING_CHANNEL_PINS;
@@ -656,7 +694,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel1.Instance = DFSDM1_Channel1;
   hdfsdm1_channel1.Init.OutputClock.Activation = ENABLE;
   hdfsdm1_channel1.Init.OutputClock.Selection = DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
-  hdfsdm1_channel1.Init.OutputClock.Divider = 40;
+  hdfsdm1_channel1.Init.OutputClock.Divider = 80;
   hdfsdm1_channel1.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel1.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel1.Init.Input.Pins = DFSDM_CHANNEL_SAME_CHANNEL_PINS;
@@ -673,7 +711,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel2.Instance = DFSDM1_Channel2;
   hdfsdm1_channel2.Init.OutputClock.Activation = ENABLE;
   hdfsdm1_channel2.Init.OutputClock.Selection = DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
-  hdfsdm1_channel2.Init.OutputClock.Divider = 40;
+  hdfsdm1_channel2.Init.OutputClock.Divider = 80;
   hdfsdm1_channel2.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel2.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel2.Init.Input.Pins = DFSDM_CHANNEL_FOLLOWING_CHANNEL_PINS;
@@ -690,7 +728,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel3.Instance = DFSDM1_Channel3;
   hdfsdm1_channel3.Init.OutputClock.Activation = ENABLE;
   hdfsdm1_channel3.Init.OutputClock.Selection = DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
-  hdfsdm1_channel3.Init.OutputClock.Divider = 40;
+  hdfsdm1_channel3.Init.OutputClock.Divider = 80;
   hdfsdm1_channel3.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel3.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel3.Init.Input.Pins = DFSDM_CHANNEL_SAME_CHANNEL_PINS;
@@ -742,7 +780,7 @@ static void MX_I2C3_Init(void)
 
   /* USER CODE END I2C3_Init 1 */
   hi2c3.Instance = I2C3;
-  hi2c3.Init.Timing = 0x10909CEC;
+  hi2c3.Init.Timing = 0x00300F33;
   hi2c3.Init.OwnAddress1 = 0;
   hi2c3.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c3.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
@@ -766,6 +804,9 @@ static void MX_I2C3_Init(void)
   {
     Error_Handler();
   }
+  /** I2C Fast mode Plus enable
+  */
+  HAL_I2CEx_EnableFastModePlus(I2C_FASTMODEPLUS_I2C3);
   /* USER CODE BEGIN I2C3_Init 2 */
 
   /* USER CODE END I2C3_Init 2 */
