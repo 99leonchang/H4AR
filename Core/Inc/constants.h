@@ -20,9 +20,13 @@
 #define RESOLUTION (4)
 #define NOISE_THRESHOLD (1)
 
-#define SMOOTHING_SAMPLES (5)
-#define SMOOTHING_THRESHOLD (8)
+#define SMOOTHING_SAMPLES (1)
+#define SMOOTHING_THRESHOLD (1000)
 
 #define MIC_OFFSET (24)
+
+# define NUMBER_OF_BINS (10)
+# define BIN_RATE (20)
+# define BIN_PERCENT_THRESHOLD (50)
 
 #endif /* INC_CONSTANTS_H_ */

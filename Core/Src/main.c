@@ -126,6 +126,9 @@ volatile int32_t SmoothedAngleEstimation2;
 volatile int32_t SmoothedConvergenceExists;
 volatile int32_t SmoothedConvergenceAngle;
 
+volatile int alreadyBinned = 1;
+int globalLastAngle = 8;
+
 // Whether first half of PlayBuf[i] is ready for acousticSL
 uint8_t PlayHalfReady[MICS] = {0, 0, 0, 0};
 
@@ -266,7 +269,6 @@ uint8_t angleToDirectionNumber(int32_t exists, int32_t estimation) {
 	return (((estimation + 23) / 45) % 8);
 }
 
-// TODO: Need to lock the volatile stuff?
 void EXTI1_Callback(void) {
 	if (RaiseIRQ & 1) {
 		Audio_ProcessAngle(0);
@@ -401,11 +403,42 @@ void EXTI1_Callback(void) {
 	} else {
 		SmoothedConvergenceExists = 0;
 	}
-
+	alreadyBinned = 0;
 	RaiseIRQ = 0;
 }
 
 /* USER CODE END 0 */
+
+/*
+ * --------------------
+ * Interface for Bins!
+ * --------------------
+ */
+void clearBins(int *bins) {
+	for (int i = 0; i < NUMBER_OF_BINS; i++) {
+		bins[i] = 0;
+	}
+}
+
+void binAngle(int *bins, int delta) {
+	if (!(delta < NUMBER_OF_BINS)) Error_Handler();
+	bins[delta]++;
+}
+
+int getBinMaxIfOk(int * bins, int binnedSamples) {
+	for (int i = 0; i < NUMBER_OF_BINS; i++) {
+		int percentOk = (bins[i] * 100) / binnedSamples;
+		if (percentOk >= BIN_PERCENT_THRESHOLD) {
+			return i;
+		}
+	}
+	return 8;
+}
+/*
+ * --------------------
+ * End Interface for Bins!
+ * --------------------
+ */
 
 /**
   * @brief  The application entry point.
@@ -494,14 +527,28 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  int lastAngle = 0;
+  int lastAngle = 8;
+  globalLastAngle = lastAngle;
+  int binnedSamples = 0;
+  int bins[NUMBER_OF_BINS];
   while (1)
   {
-	  int delta = angleToDirectionNumber(SmoothedConvergenceExists, SmoothedConvergenceAngle);
-	  if (SmoothedConvergenceExists && delta != lastAngle) {
-		  lastAngle = delta;
-		  oled_Display(lastAngle);
-	   }
+	  if (!alreadyBinned) {
+		  alreadyBinned = 1;
+		  int delta = angleToDirectionNumber(SmoothedConvergenceExists, SmoothedConvergenceAngle);
+		  binAngle(bins, delta);
+		  binnedSamples++;
+		  if (BIN_RATE <= binnedSamples) {
+			  int newBinAngle = getBinMaxIfOk(bins, binnedSamples);
+			  if (newBinAngle != lastAngle) {
+				  lastAngle = newBinAngle;
+				  globalLastAngle = lastAngle;
+				  oled_Display(lastAngle);
+			  }
+			  binnedSamples = 0;
+			  clearBins(bins);
+		  }
+	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
