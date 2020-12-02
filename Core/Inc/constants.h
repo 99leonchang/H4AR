@@ -8,7 +8,7 @@
 #ifndef INC_CONSTANTS_H_
 #define INC_CONSTANTS_H_
 
-#define SAMPLING_FREQUENCY (16000)
+#define SAMPLING_FREQUENCY (32000)
 
 /* 2 1ms-sample buffers since DFSDM has half/full */
 #define AUDIO_REC_SIZE ((SAMPLING_FREQUENCY / 1000) * 2)

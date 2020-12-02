@@ -125,7 +125,6 @@ volatile int32_t SmoothedAngleEstimation2;
 
 volatile int32_t SmoothedConvergenceExists;
 volatile int32_t SmoothedConvergenceAngle;
-volatile int32_t SmootherConvergenceAngle;
 
 // Whether first half of PlayBuf[i] is ready for acousticSL
 uint8_t PlayHalfReady[MICS] = {0, 0, 0, 0};
@@ -233,15 +232,16 @@ int GetOffsets(int offset) {
 	// unless you want to fail.
 	//
 	// - :eyes:
+	int evil_offset = 300;
 	switch (offset) {
 	case 0:
-		return 465;
+		return (465) - evil_offset;
 	case 1:
-		return 349;
+		return (349) - evil_offset;
 	case 2:
-		return 423;
+		return (423) - evil_offset;
 	case 3:
-		return 600;
+		return (600) - evil_offset;
 	default:
 		return 0;
 	}
@@ -262,8 +262,8 @@ void TransferBuffers(int offset, int low, int high) {
 // TODO: Update this when covering 360 degree range
 uint8_t angleToDirectionNumber(int32_t exists, int32_t estimation) {
 	if (!exists) return 8;
-	estimation += 90;
-	return 3 - (estimation / 45);
+	if (estimation >= 90 && estimation <= 270) return 8;
+	return (((estimation + 23) / 45) % 8);
 }
 
 // TODO: Need to lock the volatile stuff?
@@ -345,10 +345,10 @@ void EXTI1_Callback(void) {
 		int32_t numbers[6] = {AngleEstimation00, AngleEstimation01, AngleEstimation10, AngleEstimation11, AngleEstimation20, AngleEstimation21};
 		int32_t minDiff = 360;
 		int32_t avg = 0;
+		int32_t pair0_num = -1;
+		int32_t pair1_num = -1;
 		for (int i = 0; i < 2; i++) {
-			//int j = (i / 2) * 2 + 2;
-			int j = 2;
-			for (; j < 4; j++) {
+			for (int j = 2; j < 4; j++) {
 				int32_t diff = numbers[j] - numbers[i];
 				if (diff < 0) diff = -diff;
 
@@ -357,6 +357,8 @@ void EXTI1_Callback(void) {
 				int32_t trueDiff = (diff1 < diff2) ? diff1 : diff2;
 				if (trueDiff < minDiff) {
 					minDiff = trueDiff;
+					pair0_num = i;
+					pair1_num = j;
 
 					if (diff > 180) {
 						avg = (numbers[j] < numbers[i]) ? numbers[i] : numbers[j];
@@ -368,17 +370,17 @@ void EXTI1_Callback(void) {
 				}
 			}
 		}
+
 		ConvergenceAngle = avg;
 		if (ConvergenceAngle < 180) {
-			SmootherConvergenceAngle = AngleEstimation10;
+			ConvergenceAngle = numbers[pair1_num];
 		} else {
-			SmootherConvergenceAngle = AngleEstimation00;
+			ConvergenceAngle = numbers[pair0_num];
 		}
 	} else {
 		IsConvergence = 0;
 	}
 
-	/*
 	if (IsConvergence) {
 		int32_t AngleEstimation = ConvergenceAngle;
 		currentSmoothingSumConvergence -= pastEstimatesForSmoothingConvergence[currentSmoothingIndexConvergence];
@@ -399,7 +401,6 @@ void EXTI1_Callback(void) {
 	} else {
 		SmoothedConvergenceExists = 0;
 	}
-	*/
 
 	RaiseIRQ = 0;
 }
@@ -496,13 +497,11 @@ int main(void)
   int lastAngle = 0;
   while (1)
   {
-	  /*
-	  int delta = angleToDirectionNumber(AngleExists, AngleEstimation);
-	  if (AngleExists && delta != lastAngle) {
+	  int delta = angleToDirectionNumber(SmoothedConvergenceExists, SmoothedConvergenceAngle);
+	  if (SmoothedConvergenceExists && delta != lastAngle) {
 		  lastAngle = delta;
 		  oled_Display(lastAngle);
 	   }
-	   */
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -677,7 +676,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel0.Instance = DFSDM1_Channel0;
   hdfsdm1_channel0.Init.OutputClock.Activation = ENABLE;
   hdfsdm1_channel0.Init.OutputClock.Selection = DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
-  hdfsdm1_channel0.Init.OutputClock.Divider = 80;
+  hdfsdm1_channel0.Init.OutputClock.Divider = 40;
   hdfsdm1_channel0.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel0.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel0.Init.Input.Pins = DFSDM_CHANNEL_FOLLOWING_CHANNEL_PINS;
@@ -694,7 +693,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel1.Instance = DFSDM1_Channel1;
   hdfsdm1_channel1.Init.OutputClock.Activation = ENABLE;
   hdfsdm1_channel1.Init.OutputClock.Selection = DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
-  hdfsdm1_channel1.Init.OutputClock.Divider = 80;
+  hdfsdm1_channel1.Init.OutputClock.Divider = 40;
   hdfsdm1_channel1.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel1.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel1.Init.Input.Pins = DFSDM_CHANNEL_SAME_CHANNEL_PINS;
@@ -711,7 +710,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel2.Instance = DFSDM1_Channel2;
   hdfsdm1_channel2.Init.OutputClock.Activation = ENABLE;
   hdfsdm1_channel2.Init.OutputClock.Selection = DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
-  hdfsdm1_channel2.Init.OutputClock.Divider = 80;
+  hdfsdm1_channel2.Init.OutputClock.Divider = 40;
   hdfsdm1_channel2.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel2.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel2.Init.Input.Pins = DFSDM_CHANNEL_FOLLOWING_CHANNEL_PINS;
@@ -728,7 +727,7 @@ static void MX_DFSDM1_Init(void)
   hdfsdm1_channel3.Instance = DFSDM1_Channel3;
   hdfsdm1_channel3.Init.OutputClock.Activation = ENABLE;
   hdfsdm1_channel3.Init.OutputClock.Selection = DFSDM_CHANNEL_OUTPUT_CLOCK_SYSTEM;
-  hdfsdm1_channel3.Init.OutputClock.Divider = 80;
+  hdfsdm1_channel3.Init.OutputClock.Divider = 40;
   hdfsdm1_channel3.Init.Input.Multiplexer = DFSDM_CHANNEL_EXTERNAL_INPUTS;
   hdfsdm1_channel3.Init.Input.DataPacking = DFSDM_CHANNEL_STANDARD_MODE;
   hdfsdm1_channel3.Init.Input.Pins = DFSDM_CHANNEL_SAME_CHANNEL_PINS;
@@ -742,19 +741,19 @@ static void MX_DFSDM1_Init(void)
   {
     Error_Handler();
   }
-  if (HAL_DFSDM_FilterConfigRegChannel(&hdfsdm1_filter0, DFSDM_CHANNEL_0, DFSDM_CONTINUOUS_CONV_ON) != HAL_OK)
+  if (HAL_DFSDM_FilterConfigRegChannel(&hdfsdm1_filter0, DFSDM_CHANNEL_2, DFSDM_CONTINUOUS_CONV_ON) != HAL_OK)
   {
     Error_Handler();
   }
-  if (HAL_DFSDM_FilterConfigRegChannel(&hdfsdm1_filter1, DFSDM_CHANNEL_1, DFSDM_CONTINUOUS_CONV_ON) != HAL_OK)
+  if (HAL_DFSDM_FilterConfigRegChannel(&hdfsdm1_filter1, DFSDM_CHANNEL_3, DFSDM_CONTINUOUS_CONV_ON) != HAL_OK)
   {
     Error_Handler();
   }
-  if (HAL_DFSDM_FilterConfigRegChannel(&hdfsdm1_filter2, DFSDM_CHANNEL_2, DFSDM_CONTINUOUS_CONV_ON) != HAL_OK)
+  if (HAL_DFSDM_FilterConfigRegChannel(&hdfsdm1_filter2, DFSDM_CHANNEL_0, DFSDM_CONTINUOUS_CONV_ON) != HAL_OK)
   {
     Error_Handler();
   }
-  if (HAL_DFSDM_FilterConfigRegChannel(&hdfsdm1_filter3, DFSDM_CHANNEL_3, DFSDM_CONTINUOUS_CONV_ON) != HAL_OK)
+  if (HAL_DFSDM_FilterConfigRegChannel(&hdfsdm1_filter3, DFSDM_CHANNEL_1, DFSDM_CONTINUOUS_CONV_ON) != HAL_OK)
   {
     Error_Handler();
   }

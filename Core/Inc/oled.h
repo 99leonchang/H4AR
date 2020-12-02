@@ -155,28 +155,28 @@ void oled_Display(uint8_t dir_num) {
 	ssd1306_Fill(Black);
 	ssd1306_Bitmap(48, 0, bat816, 16, 8);
 	switch (dir_num) {
-		case 0:
+		case 4:
 			ssd1306_Bitmap(16, 0, arrow_0deg, 32, 32);
 			break;
-		case 1:
+		case 3:
 			ssd1306_Bitmap(16, 0, arrow_45deg, 32, 32);
 			break;
 		case 2:
 			ssd1306_Bitmap(16, 0, arrow_90deg, 32, 32);
 			break;
-		case 3:
+		case 1:
 			ssd1306_Bitmap(16, 0, arrow_135deg, 32, 32);
 			break;
-		case 4:
+		case 0:
 			ssd1306_Bitmap(16, 0, arrow_180deg, 32, 32);
 			break;
-		case 5:
+		case 7:
 			ssd1306_Bitmap(16, 0, arrow_225deg, 32, 32);
 			break;
 		case 6:
 			ssd1306_Bitmap(16, 0, arrow_270deg, 32, 32);
 			break;
-		case 7:
+		case 5:
 			ssd1306_Bitmap(16, 0, arrow_315deg, 32, 32);
 			break;
 		default:

@@ -1,5 +1,5 @@
 #MicroXplorer Configuration settings - do not modify
-DFSDM1.Divider=80
+DFSDM1.Divider=40
 DFSDM1.DmaMode_reg_FIL0=ENABLE
 DFSDM1.DmaMode_reg_FIL1=ENABLE
 DFSDM1.DmaMode_reg_FIL2=ENABLE
@@ -15,10 +15,10 @@ DFSDM1.Filter_injChannel1_FIL1=__NULL
 DFSDM1.Filter_injChannel2_FIL0=__NULL
 DFSDM1.Filter_injChannel2_FIL2=__NULL
 DFSDM1.Filter_injChannel3_FIL0=__NULL
-DFSDM1.Filter_regChannel_FIL0=DFSDM_CHANNEL_0
-DFSDM1.Filter_regChannel_FIL1=DFSDM_CHANNEL_1
-DFSDM1.Filter_regChannel_FIL2=DFSDM_CHANNEL_2
-DFSDM1.Filter_regChannel_FIL3=DFSDM_CHANNEL_3
+DFSDM1.Filter_regChannel_FIL0=DFSDM_CHANNEL_2
+DFSDM1.Filter_regChannel_FIL1=DFSDM_CHANNEL_3
+DFSDM1.Filter_regChannel_FIL2=DFSDM_CHANNEL_0
+DFSDM1.Filter_regChannel_FIL3=DFSDM_CHANNEL_1
 DFSDM1.Filter_regContinuousMode_FIL2=DFSDM_CONTINUOUS_CONV_ON
 DFSDM1.Fosr_FIL0=63
 DFSDM1.Fosr_FIL1=63
