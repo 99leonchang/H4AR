@@ -264,9 +264,9 @@ void TransferBuffers(int offset, int low, int high) {
 // TODO: Check if angle is measured anticlockwise from x-axis
 // TODO: Update this when covering 360 degree range
 uint8_t angleToDirectionNumber(int32_t exists, int32_t estimation) {
-	if (!exists) return 8;
-	if (estimation >= 90 && estimation <= 270) return 8;
-	return (((estimation + 23) / 45) % 8);
+	if (!exists) return 49;
+	if (estimation >= 90 && estimation <= 270) return 49;
+	return (((estimation + 7) / 15) % 24);
 }
 
 void EXTI1_Callback(void) {
@@ -496,6 +496,7 @@ int main(void)
   MX_DFSDM1_Init();
   MX_I2C3_Init();
   /* USER CODE BEGIN 2 */
+  HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
   oled_Init(&hi2c3);
 
   // TODO: Don't preempt computing angles -- dubious at best, evil at worst?

@@ -153,7 +153,7 @@ void oled_Init(I2C_HandleTypeDef *hi2c) {
  */
 void oled_Display(uint8_t dir_num) {
 	ssd1306_Fill(Black);
-	ssd1306_Bitmap(48, 0, bat816, 16, 8);
+	//ssd1306_Bitmap(48, 0, bat816, 16, 8);
 	switch (dir_num) {
 		case 4:
 			ssd1306_Bitmap(16, 0, arrow_0deg, 32, 32);
