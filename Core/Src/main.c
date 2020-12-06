@@ -264,9 +264,9 @@ void TransferBuffers(int offset, int low, int high) {
 // TODO: Check if angle is measured anticlockwise from x-axis
 // TODO: Update this when covering 360 degree range
 uint8_t angleToDirectionNumber(int32_t exists, int32_t estimation) {
-	if (!exists) return 49;
-	if (estimation >= 90 && estimation <= 270) return 49;
-	return (((estimation + 7) / 15) % 24);
+	if (!exists) return 8;
+	if (estimation >= 90 && estimation <= 270) return 8;
+	return (((estimation + 23) / 45) % 8);
 }
 
 void EXTI1_Callback(void) {

@@ -25,7 +25,7 @@
 
 #define MIC_OFFSET (24)
 
-# define NUMBER_OF_BINS (50)
+# define NUMBER_OF_BINS (10)
 # define BIN_RATE (20)
 # define BIN_PERCENT_THRESHOLD (50)
 
